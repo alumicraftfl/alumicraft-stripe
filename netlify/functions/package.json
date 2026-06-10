@@ -1,0 +1,8 @@
+{
+  "name": "alumicraft-stripe",
+  "version": "1.0.0",
+  "description": "Netlify Function – Stripe Checkout para AlumiCraft",
+  "dependencies": {
+    "stripe": "^16.0.0"
+  }
+}
