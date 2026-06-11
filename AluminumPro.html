@@ -405,7 +405,7 @@
     <div class="topbar-right">
       <div class="user-chip" id="user-chip" style="display:none"><div class="user-avatar" id="user-avatar">A</div><span id="user-name">Admin</span></div>
       <button class="logout-btn" id="logout-btn" style="display:none" onclick="logout()">🚪 Sair</button>
-      <img src="logo.png" alt="AlumiCraft" class="topbar-logo-img" style="height:32px;object-fit:contain" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span style="display:none" class="badge-empresa">🏗️ AlumiCraft</span>
+      <span id="topbar-logo-wrap"><span class="badge-empresa" id="topbar-logo-fallback" style="font-size:1.1rem;font-weight:800;letter-spacing:-0.3px">🏗️ AlumiCraft</span></span>
       <button class="btn btn-sm btn-outline" onclick="exportarDados()">⬇️ Exportar</button>
       <button class="btn btn-sm btn-accent" onclick="importarDados()">⬆️ Importar</button>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="carregarArquivo(event)">
@@ -431,13 +431,14 @@ let db = {
     financingAPR: 18,
     companyPhone: '',
     companyEmail: '',
-    companyAddress: ''
+    companyAddress: '',
+    logoBase64: ''
   },
   _id: { clientes:1, orcamentos:1, ordens:1, invoices:1, estoque:1, financeiro:1, contasPagar:1, leads:1, campanhas:1, users:1 }
 };
 const STORAGE_KEY = 'aluminumpro_v2';
 function salvar() { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
-function carregar() { const d = localStorage.getItem(STORAGE_KEY); if(d) { try { const p=JSON.parse(d); db={...db,...p}; if(!db.invoices) db.invoices=[]; if(!db.contasPagar) db.contasPagar=[]; if(!db.leads) db.leads=[]; if(!db.campanhas) db.campanhas=[]; if(!db.settings) db.settings={gateway:'stripe_netlify',stripeFunction:'',paymentLink:'',financingLink:'',financingAPR:18,companyPhone:'',companyEmail:'',companyAddress:''}; if(!db.settings.stripeFunction) db.settings.stripeFunction=''; if(!db._id.invoices) db._id.invoices=1; if(!db._id.contasPagar) db._id.contasPagar=1; if(!db._id.leads) db._id.leads=1; if(!db._id.campanhas) db._id.campanhas=1; if(!db.users) db.users=[]; if(!db._id.users) db._id.users=1; seedAdmin(); } catch(e){ seedAdmin(); } } else { seedAdmin(); } }
+function carregar() { const d = localStorage.getItem(STORAGE_KEY); if(d) { try { const p=JSON.parse(d); db={...db,...p}; if(!db.invoices) db.invoices=[]; if(!db.contasPagar) db.contasPagar=[]; if(!db.leads) db.leads=[]; if(!db.campanhas) db.campanhas=[]; if(!db.settings) db.settings={gateway:'stripe_netlify',stripeFunction:'',paymentLink:'',financingLink:'',financingAPR:18,companyPhone:'',companyEmail:'',companyAddress:''}; if(!db.settings.stripeFunction) db.settings.stripeFunction=''; if(!db.settings.logoBase64 && db.settings.logoBase64 !== '') db.settings.logoBase64=''; if(!db._id.invoices) db._id.invoices=1; if(!db._id.contasPagar) db._id.contasPagar=1; if(!db._id.leads) db._id.leads=1; if(!db._id.campanhas) db._id.campanhas=1; if(!db.users) db.users=[]; if(!db._id.users) db._id.users=1; seedAdmin(); } catch(e){ seedAdmin(); } } else { seedAdmin(); } }
 function nextId(col) { const id=db._id[col]++; salvar(); return id; }
 
 // ===== NAVEGAÇÃO =====
@@ -959,19 +960,95 @@ function imprimirOrc(id) {
   const o=db.orcamentos.find(x=>x.id==id); if(!o)return;
   const c=db.clientes.find(x=>x.id==o.clienteId);
   const total=orcTotal(o); const desc=parseFloat(o.desconto||0);
+  const logoHtml=getLogoForPrint();
+  const companyBlock=getCompanyBlock();
   const win=window.open('','_blank');
-  win.document.write(`<html><head><title>Quote #${o.id}</title><style>body{font-family:Arial,sans-serif;padding:30px;max-width:720px;margin:auto;font-size:14px}h1{color:#1a5fa8;font-size:22px}.info{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.info div{background:#f5f7fa;padding:10px;border-radius:6px}h2{font-size:13px;color:#6b7a99;margin-bottom:4px}table{width:100%;border-collapse:collapse;margin:14px 0}th{background:#f5f7fa;padding:8px;text-align:left;font-size:12px;text-transform:uppercase;color:#6b7a99}td{padding:8px;border-bottom:1px solid #e4e8ef}.total-box{text-align:right;font-size:15px;font-weight:700;margin-top:8px}</style></head><body>
-  <h1>🏗️ AlumiCraft – Quote #${o.id}</h1>
-  <div class="info">
-    <div><h2>Client</h2><strong>${c?.nome||'-'}</strong><br>${c?.telefone||''}<br>${c?.email||''}<br>${c?.endereco||''}</div>
-    <div><h2>Details</h2>Date: <strong>${fmtDate(o.data)}</strong><br>Valid until: <strong>${fmtDate(o.validade)}</strong><br>Service: <strong>${servicoLabel(o.servico)}</strong></div>
+  win.document.write(`<html><head><title>Estimate #EST-${String(o.id).padStart(4,'0')}</title>
+  <style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;padding:40px;max-width:780px;margin:auto;color:#2d3a52;font-size:13.5px;background:#fff}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #1a5fa8}
+  .company-side{display:flex;flex-direction:column;gap:3px}
+  .company-name{font-size:13px;font-weight:700;color:#1a5fa8;margin-top:6px}
+  .doc-meta{text-align:right}
+  .doc-title{font-size:30px;font-weight:900;color:#1a5fa8;letter-spacing:1px;line-height:1}
+  .doc-meta p{font-size:12px;color:#6b7a99;margin-top:4px}
+  .section-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+  .info-box{background:#f7f9fc;padding:14px 16px;border-radius:8px;border-left:4px solid #1a5fa8}
+  .info-box h3{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:8px}
+  .info-box p{font-size:13px;line-height:1.7;color:#2d3a52}
+  table{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:13px}
+  thead tr{background:#1a5fa8}
+  th{padding:10px 12px;text-align:left;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;color:#fff}
+  th:last-child,td:last-child{text-align:right}
+  td{padding:10px 12px;border-bottom:1px solid #eaeff6;color:#2d3a52}
+  tr:nth-child(even) td{background:#f9fafc}
+  .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:20px}
+  .totals{width:280px}
+  .tot-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eaeff6;font-size:13px}
+  .tot-row.grand{background:#1a5fa8;color:#fff;font-weight:800;font-size:15px;padding:12px 14px;border-radius:8px;border:none;margin-top:4px}
+  .tot-row.disc{color:#c62828}
+  .notes-box{background:#f7f9fc;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:13px;border-left:4px solid #94a3b8}
+  .notes-box h4{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:6px}
+  .validity-banner{background:#e8f5e9;border-radius:8px;padding:10px 16px;margin-bottom:20px;font-size:12.5px;color:#2e7d32;font-weight:600;text-align:center}
+  .sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:36px}
+  .sig-line{border-top:1.5px solid #b0bbc8;padding-top:8px;font-size:11.5px;color:#8a97b0;text-align:center}
+  .footer{margin-top:24px;padding-top:14px;border-top:1px solid #eaeff6;font-size:11.5px;color:#8a97b0;text-align:center;line-height:1.8}
+  @media print{body{padding:24px}}
+  </style></head><body>
+  <div class="header">
+    <div class="company-side">
+      ${logoHtml}
+      <div class="company-name">AlumiCraft – Aluminum Industry</div>
+      ${companyBlock}
+    </div>
+    <div class="doc-meta">
+      <div class="doc-title">ESTIMATE</div>
+      <p style="font-weight:700;font-size:13px;margin-top:6px">#EST-${String(o.id).padStart(4,'0')}</p>
+      <p>Date: <strong>${fmtDate(o.data)}</strong></p>
+      ${o.validade?`<p>Valid Until: <strong>${fmtDate(o.validade)}</strong></p>`:''}
+    </div>
   </div>
-  <table><thead><tr><th>Type</th><th>Description</th><th>Qty/ft</th><th>Unit Price</th><th>Subtotal</th></tr></thead><tbody>
-  ${(o.itens||[]).map(it=>`<tr><td>${servicoLabel(it.tipo)}</td><td>${it.desc||'-'}</td><td>${it.qty}</td><td>$ ${parseFloat(it.preco||0).toFixed(2)}</td><td>$ ${(parseFloat(it.qty||0)*parseFloat(it.preco||0)).toFixed(2)}</td></tr>`).join('')}
-  </tbody></table>
-  ${desc>0?`<div class="total-box">Subtotal: $ ${total.toFixed(2)}<br>Discount: -$ ${desc.toFixed(2)}<br><strong>Total: $ ${(total-desc).toFixed(2)}</strong></div>`:`<div class="total-box"><strong>Total: $ ${total.toFixed(2)}</strong></div>`}
-  ${o.descricao?`<p style="margin-top:14px;padding:10px;background:#f5f7fa;border-radius:6px"><strong>Notes:</strong> ${o.descricao}</p>`:''}
-  <script>window.onload=()=>window.print()<\/script></body></html>`);win.document.close();
+  ${o.validade?`<div class="validity-banner">📋 This estimate is valid until ${fmtDate(o.validade)} · Subject to material price changes</div>`:''}
+  <div class="section-grid">
+    <div class="info-box">
+      <h3>Bill To / Client</h3>
+      <p><strong>${c?.nome||'-'}</strong><br>
+      ${c?.telefone?`📞 ${c.telefone}<br>`:''}
+      ${c?.email?`✉️ ${c.email}<br>`:''}
+      ${c?.endereco?`📍 ${c.endereco}`:''}</p>
+    </div>
+    <div class="info-box">
+      <h3>Estimate Details</h3>
+      <p>Service: <strong>${servicoLabel(o.servico)}</strong><br>
+      ${o.tecnico?`Assigned To: <strong>${o.tecnico}</strong><br>`:''}
+      Status: <strong>${o.status||'Pending'}</strong></p>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>Type</th><th>Description</th><th>Qty / ft</th><th>Unit Price</th><th>Amount</th></tr></thead>
+    <tbody>
+    ${(o.itens||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${servicoLabel(it.tipo)}</td><td>${it.desc||'-'}</td><td style="text-align:right">${it.qty}</td><td style="text-align:right">$ ${parseFloat(it.preco||0).toFixed(2)}</td><td style="text-align:right">$ ${(parseFloat(it.qty||0)*parseFloat(it.preco||0)).toFixed(2)}</td></tr>`).join('')}
+    </tbody>
+  </table>
+  <div class="totals-wrap">
+    <div class="totals">
+      <div class="tot-row"><span>Subtotal</span><span>$ ${total.toFixed(2)}</span></div>
+      ${desc>0?`<div class="tot-row disc"><span>Discount</span><span>-$ ${desc.toFixed(2)}</span></div>`:''}
+      <div class="tot-row grand"><span>TOTAL</span><span>$ ${(total-desc).toFixed(2)}</span></div>
+    </div>
+  </div>
+  ${o.descricao?`<div class="notes-box"><h4>Notes / Scope of Work</h4><p>${o.descricao}</p></div>`:''}
+  <div class="sig-grid">
+    <div class="sig-line">Client Signature &amp; Date</div>
+    <div class="sig-line">Authorized By &amp; Date</div>
+  </div>
+  <div class="footer">
+    <p><strong>AlumiCraft – Aluminum Industry</strong> | Estimate #EST-${String(o.id).padStart(4,'0')}</p>
+    <p>Gutters · Soffit · Pool Cage · Carport · Railing · Screen Enclosure</p>
+    <p style="margin-top:4px">Acceptance of this estimate authorizes AlumiCraft to proceed with the described work.</p>
+  </div>
+  <script>window.onload=()=>window.print()<\/script></body></html>\`);win.document.close();
 }
 
 // ===== ORDENS DE SERVIÇO =====
@@ -1044,85 +1121,97 @@ function imprimirOS(id) {
   const o=db.ordens.find(x=>x.id==id); if(!o)return;
   const c=db.clientes.find(x=>x.id==o.clienteId);
   const orc=o.orcamentoId?db.orcamentos.find(x=>x.id==o.orcamentoId):null;
+  const logoHtml=getLogoForPrint();
+  const companyBlock=getCompanyBlock();
   const statusColor={Agendado:'#1a5fa8','Em Andamento':'#f59e0b',Concluído:'#22c55e',Cancelado:'#ef4444'};
   const win=window.open('','_blank');
-  win.document.write(`<html><head><title>Work Order #WO-${String(o.id).padStart(4,'0')}</title><style>
+  win.document.write(`<html><head><title>Work Order #WO-${String(o.id).padStart(4,'0')}</title>
+  <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Helvetica Neue',Arial,sans-serif;padding:40px;max-width:760px;margin:auto;color:#2d3a52;font-size:14px}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;padding:40px;max-width:780px;margin:auto;color:#2d3a52;font-size:13.5px;background:#fff}
   .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #1a5fa8}
-  .company h1{font-size:20px;color:#1a5fa8;font-weight:800}
-  .company p{font-size:12px;color:#6b7a99;margin-top:3px}
-  .wo-meta{text-align:right}.wo-title{font-size:26px;font-weight:800;color:#1a5fa8;letter-spacing:1px}
-  .wo-meta p{font-size:12px;color:#6b7a99;margin-top:3px}
-  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
-  .info-box{background:#f5f7fa;padding:14px;border-radius:8px;border-left:4px solid #1a5fa8}
-  .info-box h3{font-size:11px;text-transform:uppercase;color:#6b7a99;letter-spacing:0.5px;margin-bottom:8px;font-weight:600}
-  .info-box p{font-size:13px;line-height:1.7}
-  .status-badge{display:inline-block;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:20px}
-  table{width:100%;border-collapse:collapse;margin-bottom:20px}
-  thead{background:#1a5fa8;color:#fff}th{padding:10px 12px;text-align:left;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px}
-  td{padding:10px 12px;border-bottom:1px solid #e4e8ef;font-size:13px}tr:last-child td{border-bottom:none}
+  .company-side{display:flex;flex-direction:column;gap:3px}
+  .company-name{font-size:13px;font-weight:700;color:#1a5fa8;margin-top:6px}
+  .doc-meta{text-align:right}
+  .doc-title{font-size:28px;font-weight:900;color:#1a5fa8;letter-spacing:1.5px;line-height:1}
+  .doc-meta p{font-size:12px;color:#6b7a99;margin-top:4px}
+  .status-badge{display:inline-block;padding:5px 16px;border-radius:20px;font-size:12px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:20px}
+  .section-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+  .info-box{background:#f7f9fc;padding:14px 16px;border-radius:8px;border-left:4px solid #1a5fa8}
+  .info-box h3{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:8px}
+  .info-box p{font-size:13px;line-height:1.8;color:#2d3a52}
+  table{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:13px}
+  thead tr{background:#1a5fa8}
+  th{padding:10px 12px;text-align:left;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;color:#fff}
+  th:last-child,td:last-child{text-align:right}
+  td{padding:10px 12px;border-bottom:1px solid #eaeff6;color:#2d3a52}
   tr:nth-child(even) td{background:#f9fafc}
-  .total-box{text-align:right;font-weight:700;font-size:15px;padding:12px;background:#f5f7fa;border-radius:8px;margin-bottom:20px}
-  .sig-section{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:30px}
-  .sig-line{border-top:1px solid #b0bbc8;padding-top:8px;font-size:12px;color:#6b7a99;text-align:center}
-  .notes-box{background:#f5f7fa;border-radius:8px;padding:14px;margin-bottom:20px;font-size:13px}
-  .notes-box h4{font-size:11px;text-transform:uppercase;color:#6b7a99;margin-bottom:5px;font-weight:600}
-  .footer{margin-top:24px;padding-top:14px;border-top:1px solid #e4e8ef;font-size:12px;color:#6b7a99;text-align:center}
+  .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:20px}
+  .totals{width:260px}
+  .tot-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eaeff6;font-size:13px}
+  .tot-row.grand{background:#1a5fa8;color:#fff;font-weight:800;font-size:15px;padding:12px 14px;border-radius:8px;border:none;margin-top:4px}
+  .notes-box{background:#f7f9fc;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:13px;border-left:4px solid #94a3b8}
+  .notes-box h4{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:6px}
+  .sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:36px}
+  .sig-line{border-top:1.5px solid #b0bbc8;padding-top:8px;font-size:11.5px;color:#8a97b0;text-align:center}
+  .footer{margin-top:24px;padding-top:14px;border-top:1px solid #eaeff6;font-size:11.5px;color:#8a97b0;text-align:center;line-height:1.8}
+  @media print{body{padding:24px}}
   </style></head><body>
   <div class="header">
-    <div class="company">
-      <img src="logo.png" alt="AlumiCraft" style="height:55px;object-fit:contain;margin-bottom:6px" onerror="this.style.display='none'">
-      <h1>AlumiCraft – Aluminum Industry</h1>
-      <p>Professional Aluminum Solutions</p>
-      <p>Gutters · Soffit · Pool Cage · Carport · Railing</p>
+    <div class="company-side">
+      ${logoHtml}
+      <div class="company-name">AlumiCraft – Aluminum Industry</div>
+      ${companyBlock}
     </div>
-    <div class="wo-meta">
-      <div class="wo-title">WORK ORDER</div>
-      <p>#WO-${String(o.id).padStart(4,'0')}</p>
-      <p>Issued: ${fmtDate(o.dataInicio)}</p>
-      ${o.dataFim?`<p>Due: ${fmtDate(o.dataFim)}</p>`:''}
-      ${o.orcamentoId?`<p>Quote ref: #${o.orcamentoId}</p>`:''}
+    <div class="doc-meta">
+      <div class="doc-title">WORK ORDER</div>
+      <p style="font-weight:700;font-size:13px;margin-top:6px">#WO-${String(o.id).padStart(4,'0')}</p>
+      <p>Issued: <strong>${fmtDate(o.dataInicio)}</strong></p>
+      ${o.dataFim?`<p>Due: <strong>${fmtDate(o.dataFim)}</strong></p>`:''}
+      ${o.orcamentoId?`<p>Estimate Ref: <strong>#EST-${String(o.orcamentoId).padStart(4,'0')}</strong></p>`:''}
     </div>
   </div>
-  <div style="margin-bottom:16px">
+  <div style="margin-bottom:18px">
     <span class="status-badge" style="background:${statusColor[o.status]||'#1a5fa8'}">${o.status}</span>
   </div>
-  <div class="info-grid">
+  <div class="section-grid">
     <div class="info-box">
-      <h3>Client Information</h3>
+      <h3>Job Site / Client Address</h3>
       <p><strong>${c?.nome||'-'}</strong><br>
-      ${c?.telefone?`📞 ${c.telefone}<br>`:''}
-      ${c?.email?`✉️ ${c.email}<br>`:''}
-      ${c?.endereco?`📍 ${c.endereco}`:''}</p>
+      ${c?.endereco?`📍 ${c.endereco}`:'<em style="color:#8a97b0">No address on file</em>'}</p>
     </div>
     <div class="info-box">
-      <h3>Work Details</h3>
-      <p>Service: <strong>${servicoLabel(o.servico)}</strong><br>
+      <h3>Service Details</h3>
+      <p>Type: <strong>${servicoLabel(o.servico)}</strong><br>
       ${o.tecnico?`Technician: <strong>${o.tecnico}</strong><br>`:''}
       Start: <strong>${fmtDate(o.dataInicio)}</strong><br>
-      ${o.dataFim?`End: <strong>${fmtDate(o.dataFim)}</strong>`:'End: <em>TBD</em>'}</p>
+      ${o.dataFim?`Completion: <strong>${fmtDate(o.dataFim)}</strong>`:'Completion: <em>TBD</em>'}</p>
     </div>
   </div>
   ${orc&&orc.itens&&orc.itens.length>0?`
   <table>
-    <thead><tr><th>Type</th><th>Description</th><th>Qty/ft</th><th>Unit Price</th><th>Amount</th></tr></thead>
+    <thead><tr><th>#</th><th>Type</th><th>Description</th><th style="text-align:right">Qty / ft</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead>
     <tbody>
-    ${orc.itens.map(it=>`<tr><td>${servicoLabel(it.tipo)}</td><td>${it.desc||'-'}</td><td>${it.qty}</td><td>$ ${parseFloat(it.preco||0).toFixed(2)}</td><td>$ ${(parseFloat(it.qty||0)*parseFloat(it.preco||0)).toFixed(2)}</td></tr>`).join('')}
+    ${orc.itens.map((it,i)=>`<tr><td>${i+1}</td><td>${servicoLabel(it.tipo)}</td><td>${it.desc||'-'}</td><td style="text-align:right">${it.qty}</td><td style="text-align:right">$ ${parseFloat(it.preco||0).toFixed(2)}</td><td style="text-align:right">$ ${(parseFloat(it.qty||0)*parseFloat(it.preco||0)).toFixed(2)}</td></tr>`).join('')}
     </tbody>
   </table>
-  <div class="total-box">Estimated Total: $ ${(()=>{const t=orc.itens.reduce((s,it)=>s+parseFloat(it.qty||0)*parseFloat(it.preco||0),0);const d=parseFloat(orc.desconto||0);return(t-d).toFixed(2)})()}</div>`
+  <div class="totals-wrap">
+    <div class="totals">
+      ${(()=>{const t=orc.itens.reduce((s,it)=>s+parseFloat(it.qty||0)*parseFloat(it.preco||0),0);const d=parseFloat(orc.desconto||0);return `<div class="tot-row"><span>Subtotal</span><span>$ ${t.toFixed(2)}</span></div>${d>0?`<div class="tot-row" style="color:#c62828"><span>Discount</span><span>-$ ${d.toFixed(2)}</span></div>`:''}<div class="tot-row grand"><span>Estimated Total</span><span>$ ${(t-d).toFixed(2)}</span></div>`;})()}
+    </div>
+  </div>`
   :`<div class="notes-box"><h4>Scope of Work</h4><p>${o.obs||'To be defined on site.'}</p></div>`}
-  ${o.obs?`<div class="notes-box"><h4>Notes / Instructions</h4><p>${o.obs}</p></div>`:''}
-  <div class="sig-section">
+  ${o.obs?`<div class="notes-box"><h4>Notes / Special Instructions</h4><p>${o.obs}</p></div>`:''}
+  <div class="sig-grid">
     <div class="sig-line">Client Signature &amp; Date</div>
     <div class="sig-line">Technician Signature &amp; Date</div>
   </div>
   <div class="footer">
-    <p>AlumiCraft – Aluminum Industry | Work Order #WO-${String(o.id).padStart(4,'0')}</p>
+    <p><strong>AlumiCraft – Aluminum Industry</strong> | Work Order #WO-${String(o.id).padStart(4,'0')}</p>
+    <p>Gutters · Soffit · Pool Cage · Carport · Railing · Screen Enclosure</p>
     <p style="margin-top:4px">This document authorizes AlumiCraft to perform the services described above.</p>
   </div>
-  <script>window.onload=()=>window.print()<\/script></body></html>`);
+  <script>window.onload=()=>window.print()<\/script></body></html>\`);
   win.document.close();
 }
 
@@ -1255,57 +1344,97 @@ function imprimirInvoice(id) {
   const inv=db.invoices.find(x=>x.id==id); if(!inv)return;
   const c=clienteObj(inv.clienteId);
   const num=invNumero(inv);
+  const logoHtml=getLogoForPrint();
+  const companyBlock=getCompanyBlock();
+  const statusAtual=invStatusAtual(inv);
   const win=window.open('','_blank');
-  win.document.write(`<html><head><title>${num}</title><style>
-  *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Helvetica Neue',Arial,sans-serif;padding:40px;max-width:760px;margin:auto;color:#2d3a52;font-size:14px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:3px solid #1a5fa8}
-  .company h1{font-size:22px;color:#1a5fa8;font-weight:800}
-  .company p{font-size:12px;color:#6b7a99;margin-top:3px}
-  .inv-meta{text-align:right}.inv-meta .inv-title{font-size:28px;font-weight:800;color:#1a5fa8;letter-spacing:1px}
-  .inv-meta p{font-size:12px;color:#6b7a99;margin-top:3px}
-  .bill-section{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px}
-  .bill-box h3{font-size:11px;text-transform:uppercase;color:#6b7a99;letter-spacing:0.5px;margin-bottom:6px;font-weight:600}
-  .bill-box p{font-size:13px;line-height:1.6}
-  .status-box{display:inline-block;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:700;background:#e8f0fb;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.5px}
-  table{width:100%;border-collapse:collapse;margin-bottom:20px}
-  thead{background:#1a5fa8;color:#fff}th{padding:10px 12px;text-align:left;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px}
-  td{padding:10px 12px;border-bottom:1px solid #e4e8ef;font-size:13px}tr:last-child td{border-bottom:none}
+  win.document.write(`<html><head><title>${num}</title>
+  <style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;padding:40px;max-width:780px;margin:auto;color:#2d3a52;font-size:13.5px;background:#fff}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #1a5fa8}
+  .company-side{display:flex;flex-direction:column;gap:3px}
+  .company-name{font-size:13px;font-weight:700;color:#1a5fa8;margin-top:6px}
+  .doc-meta{text-align:right}
+  .doc-title{font-size:30px;font-weight:900;color:#1a5fa8;letter-spacing:1px;line-height:1}
+  .doc-meta p{font-size:12px;color:#6b7a99;margin-top:4px}
+  .status-chip{display:inline-block;padding:3px 12px;border-radius:12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;margin-top:6px}
+  .section-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+  .info-box{background:#f7f9fc;padding:14px 16px;border-radius:8px;border-left:4px solid #1a5fa8}
+  .info-box h3{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:8px}
+  .info-box p{font-size:13px;line-height:1.8;color:#2d3a52}
+  table{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:13px}
+  thead tr{background:#1a5fa8}
+  th{padding:10px 12px;text-align:left;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;color:#fff}
+  th:last-child,td:last-child{text-align:right}
+  td{padding:10px 12px;border-bottom:1px solid #eaeff6;color:#2d3a52}
   tr:nth-child(even) td{background:#f9fafc}
-  .totals{margin-left:auto;width:280px;border:1px solid #e4e8ef;border-radius:8px;overflow:hidden}
-  .totals-row{display:flex;justify-content:space-between;padding:9px 14px;font-size:13px;border-bottom:1px solid #e4e8ef}
-  .totals-row:last-child{background:#1a5fa8;color:#fff;font-weight:700;font-size:15px;border:none}
-  .totals-row.disc{color:#d32f2f}
-  .footer{margin-top:28px;padding-top:16px;border-top:1px solid #e4e8ef;font-size:12px;color:#6b7a99;text-align:center}
-  .notes-box{background:#f5f7fa;border-radius:8px;padding:14px;margin-bottom:20px;font-size:13px}
-  .notes-box h4{font-size:11px;text-transform:uppercase;color:#6b7a99;margin-bottom:5px}
-  .due-banner{background:${invStatusAtual(inv)==='Vencido'?'#fce4ec':'#e8f5e9'};border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-weight:600;color:${invStatusAtual(inv)==='Vencido'?'#c62828':'#2e7d32'};text-align:center}
+  .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:20px}
+  .totals{width:290px}
+  .tot-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eaeff6;font-size:13px}
+  .tot-row.grand{background:#1a5fa8;color:#fff;font-weight:800;font-size:15px;padding:12px 14px;border-radius:8px;border:none;margin-top:4px}
+  .tot-row.disc{color:#c62828}
+  .banner{border-radius:8px;padding:12px 18px;margin-bottom:20px;font-size:13px;font-weight:700;text-align:center}
+  .banner.paid{background:#e8f5e9;color:#2e7d32}
+  .banner.overdue{background:#fce4ec;color:#c62828}
+  .notes-box{background:#f7f9fc;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:13px;border-left:4px solid #94a3b8}
+  .notes-box h4{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:6px}
+  .pay-box{background:linear-gradient(135deg,#635bff12,#635bff06);border:2px solid #635bff40;border-radius:12px;padding:18px;margin-bottom:20px;text-align:center}
+  .footer{margin-top:24px;padding-top:14px;border-top:1px solid #eaeff6;font-size:11.5px;color:#8a97b0;text-align:center;line-height:1.8}
+  @media print{body{padding:24px}}
   </style></head><body>
   <div class="header">
-    <div class="company"><img src="logo.png" alt="AlumiCraft" style="height:55px;object-fit:contain;margin-bottom:6px" onerror="this.style.display='none'"><h1 style="color:#1a5fa8;font-size:20px">AlumiCraft – Aluminum Industry</h1><p>Professional Aluminum Solutions</p><p>Gutters · Soffit · Pool Cage · Carport · Railing</p></div>
-    <div class="inv-meta"><div class="inv-title">INVOICE</div><p>${num}</p><p>Date: ${fmtDate(inv.dataEmissao)}</p><p>Due: ${fmtDate(inv.dataVenc)}</p><p style="margin-top:5px"><span class="status-box">${invStatusAtual(inv)}</span></p></div>
-  </div>
-  <div class="bill-section">
-    <div class="bill-box"><h3>Bill To</h3><p><strong>${c.nome||'-'}</strong><br>${c.telefone||''}<br>${c.email||''}<br>${c.endereco||''}</p></div>
-    <div class="bill-box"><h3>Service Details</h3><p>Service: <strong>${servicoLabel(inv.servico)}</strong><br>
-    ${inv.tecnico?`Technician: <strong>${inv.tecnico}</strong><br>`:''}
-    ${inv.osId?`Work Order #: <strong>OS-${inv.osId}</strong><br>`:''}
-    Payment Terms: <strong>${inv.paymentTerms||'Net 30'}</strong></p></div>
-  </div>
-  ${inv.status!=='Pago'&&invStatusAtual(inv)==='Vencido'?`<div class="due-banner">⚠️ OVERDUE – Payment was due on ${fmtDate(inv.dataVenc)}</div>`:inv.status==='Pago'?`<div class="due-banner" style="background:#e8f5e9;color:#2e7d32">✅ PAID – Received on ${fmtDate(inv.dataPagamento||inv.dataEmissao)}</div>`:''}
-  <table><thead><tr><th>#</th><th>Type</th><th>Description</th><th>Qty/ft</th><th>Unit Price</th><th>Amount</th></tr></thead><tbody>
-  ${(inv.itens||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${servicoLabel(it.tipo)}</td><td>${it.desc||'-'}</td><td>${it.qty}</td><td>$ ${parseFloat(it.preco||0).toFixed(2)}</td><td>$ ${(parseFloat(it.qty||0)*parseFloat(it.preco||0)).toFixed(2)}</td></tr>`).join('')}
-  </tbody></table>
-  <div style="display:flex;justify-content:flex-end">
-    <div class="totals">
-      <div class="totals-row"><span>Subtotal</span><span>$ ${parseFloat(inv.subtotal||0).toFixed(2)}</span></div>
-      ${parseFloat(inv.desconto||0)>0?`<div class="totals-row disc"><span>Discount</span><span>-$ ${parseFloat(inv.desconto||0).toFixed(2)}</span></div>`:''}
-      <div class="totals-row"><span>TOTAL DUE</span><span>$ ${parseFloat(inv.total||0).toFixed(2)}</span></div>
+    <div class="company-side">
+      ${logoHtml}
+      <div class="company-name">AlumiCraft – Aluminum Industry</div>
+      ${companyBlock}
+    </div>
+    <div class="doc-meta">
+      <div class="doc-title">INVOICE</div>
+      <p style="font-weight:700;font-size:13px;margin-top:6px">${num}</p>
+      <p>Date: <strong>${fmtDate(inv.dataEmissao)}</strong></p>
+      <p>Due: <strong>${fmtDate(inv.dataVenc)}</strong></p>
+      <div><span class="status-chip" style="background:${statusAtual==='Pago'?'#e8f5e9':statusAtual==='Vencido'?'#fce4ec':'#e8f0fb'};color:${statusAtual==='Pago'?'#2e7d32':statusAtual==='Vencido'?'#c62828':'#1a5fa8'}">${statusAtual}</span></div>
     </div>
   </div>
-  ${inv.notas?`<div class="notes-box"><h4>Notes / Terms</h4><p>${inv.notas}</p></div>`:''}
-  ${inv.stripePayLink&&inv.status!=='Pago'?`<div style="background:linear-gradient(135deg,#635bff12,#635bff06);border:2px solid #635bff50;border-radius:12px;padding:18px 20px;margin-bottom:20px;text-align:center"><p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#635bff">⚡ PAY ONLINE — SECURE STRIPE CHECKOUT</p><p style="margin:0 0 10px;font-size:11px;color:#6b7a99">Pay $ ${parseFloat(inv.total||0).toFixed(2)} securely with Visa, Mastercard, Apple Pay or Google Pay</p><a href="${inv.stripePayLink}" style="display:inline-block;background:#635bff;color:#fff;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">💳 Click Here to Pay — $ ${parseFloat(inv.total||0).toFixed(2)}</a><p style="margin:10px 0 0;font-size:9px;color:#a0aab4;word-break:break-all">${inv.stripePayLink}</p></div>`:(()=>{const pl=db.settings?.paymentLink||''; if(!pl) return ''; const u=pl.startsWith('http')?pl:'https://'+pl; return `<div style="background:#f0f9ff;border:2px solid #0ea5e9;border-radius:10px;padding:16px 20px;margin-bottom:20px;text-align:center"><p style="margin:0 0 6px;font-size:13px;color:#0369a1;font-weight:600">💳 Pay Online – Secure Card Payment</p><p style="margin:0;font-size:12px;color:#0369a1;word-break:break-all"><a href="${u}" style="color:#0369a1">${u}</a></p></div>`;})()}
-  <div class="footer"><p>Thank you for your business! | ${num} | AlumiCraft – Aluminum Industry</p><p style="margin-top:4px">Please reference the invoice number with your payment.</p></div>
-  <script>window.onload=()=>window.print()<\/script></body></html>`);
+  ${inv.status==='Pago'?`<div class="banner paid">✅ PAID – Payment received on ${fmtDate(inv.dataPagamento||inv.dataEmissao)}</div>`:statusAtual==='Vencido'?`<div class="banner overdue">⚠️ OVERDUE – Payment was due on ${fmtDate(inv.dataVenc)}</div>`:''}
+  <div class="section-grid">
+    <div class="info-box">
+      <h3>Bill To</h3>
+      <p><strong>${c.nome||'-'}</strong><br>
+      ${c.telefone?`📞 ${c.telefone}<br>`:''}
+      ${c.email?`✉️ ${c.email}<br>`:''}
+      ${c.endereco?`📍 ${c.endereco}`:''}</p>
+    </div>
+    <div class="info-box">
+      <h3>Invoice Details</h3>
+      <p>Service: <strong>${servicoLabel(inv.servico)}</strong><br>
+      ${inv.tecnico?`Technician: <strong>${inv.tecnico}</strong><br>`:''}
+      ${inv.osId?`Work Order: <strong>#WO-${String(inv.osId).padStart(4,'0')}</strong><br>`:''}
+      Payment Terms: <strong>${inv.paymentTerms||'Net 30'}</strong></p>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>Type</th><th>Description</th><th style="text-align:right">Qty / ft</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead>
+    <tbody>
+    ${(inv.itens||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${servicoLabel(it.tipo)}</td><td>${it.desc||'-'}</td><td style="text-align:right">${it.qty}</td><td style="text-align:right">$ ${parseFloat(it.preco||0).toFixed(2)}</td><td style="text-align:right">$ ${(parseFloat(it.qty||0)*parseFloat(it.preco||0)).toFixed(2)}</td></tr>`).join('')}
+    </tbody>
+  </table>
+  <div class="totals-wrap">
+    <div class="totals">
+      <div class="tot-row"><span>Subtotal</span><span>$ ${parseFloat(inv.subtotal||0).toFixed(2)}</span></div>
+      ${parseFloat(inv.desconto||0)>0?`<div class="tot-row disc"><span>Discount</span><span>-$ ${parseFloat(inv.desconto||0).toFixed(2)}</span></div>`:''}
+      <div class="tot-row grand"><span>TOTAL DUE</span><span>$ ${parseFloat(inv.total||0).toFixed(2)}</span></div>
+    </div>
+  </div>
+  ${inv.notas?`<div class="notes-box"><h4>Notes / Payment Terms</h4><p>${inv.notas}</p></div>`:''}
+  ${inv.stripePayLink&&inv.status!=='Pago'?`<div class="pay-box"><p style="font-size:14px;font-weight:800;color:#635bff;margin:0 0 8px">⚡ PAY ONLINE – SECURE STRIPE CHECKOUT</p><p style="font-size:12px;color:#6b7a99;margin:0 0 12px">Pay $ ${parseFloat(inv.total||0).toFixed(2)} with Visa, Mastercard, Apple Pay or Google Pay</p><a href="${inv.stripePayLink}" style="display:inline-block;background:#635bff;color:#fff;padding:11px 30px;border-radius:8px;font-size:14px;font-weight:800;text-decoration:none">💳 Pay Now – $ ${parseFloat(inv.total||0).toFixed(2)}</a></div>`:(()=>{const pl=db.settings?.paymentLink||'';if(!pl)return '';const u=pl.startsWith('http')?pl:'https://'+pl;return `<div class="pay-box"><p style="font-size:13px;color:#0369a1;font-weight:700;margin:0 0 6px">💳 Pay Online – Secure Card Payment</p><p style="margin:0;font-size:12px;color:#0369a1;word-break:break-all"><a href="${u}" style="color:#0369a1">${u}</a></p></div>`;})()}
+  <div class="footer">
+    <p><strong>AlumiCraft – Aluminum Industry</strong> | ${num}</p>
+    <p>Gutters · Soffit · Pool Cage · Carport · Railing · Screen Enclosure</p>
+    <p style="margin-top:4px">Thank you for your business! Please reference the invoice number with your payment.</p>
+  </div>
+  <script>window.onload=()=>window.print()<\/script></body></html>\`);
   win.document.close();
 }
 
@@ -1660,6 +1789,23 @@ function renderSettings() {
         </div>
       </div>
 
+      <div style="margin-bottom:28px">
+        <h3 style="font-size:.85rem;text-transform:uppercase;color:var(--text-muted);letter-spacing:.5px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">🖼️ Logo da Empresa</h3>
+        <div class="form-grid">
+          <div class="form-group span2">
+            <label>Arquivo de Logo (PNG, JPG ou SVG)</label>
+            <input type="file" id="cfg-logo-file" accept="image/*" onchange="logoFileChanged(event)" style="padding:6px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);width:100%">
+            <small style="color:var(--text-muted);font-size:.77rem">A logo aparecerá no topo do app e em todos os PDFs (Invoice, Orçamento e Ordem de Serviço).</small>
+          </div>
+          ${s.logoBase64?`<div class="form-group span2">
+            <label>Preview da Logo</label>
+            <div style="background:#0d1b2e;padding:14px;border-radius:10px;display:inline-block;border:1px solid var(--border)">
+              <img src="${s.logoBase64}" style="max-height:70px;max-width:260px;object-fit:contain;display:block">
+            </div>
+            <br><button class="btn btn-sm" style="margin-top:8px;background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer" onclick="removerLogo()">🗑️ Remover Logo</button>
+          </div>`:'<div class="form-group span2"><p style="font-size:.82rem;color:var(--text-muted)">Nenhuma logo carregada ainda. Faça upload de um arquivo de imagem acima.</p></div>'}
+        </div>
+      </div>
 
       <div style="margin-bottom:28px">
         <h3 style="font-size:.85rem;text-transform:uppercase;color:var(--text-muted);letter-spacing:.5px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">📥 Importar do HouseCall Pro</h3>
@@ -1711,6 +1857,55 @@ function renderSettings() {
     </div>`;
 }
 
+function logoFileChanged(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    db.settings.logoBase64 = e.target.result;
+    salvar();
+    updateTopbarLogo();
+    toast('Logo carregada com sucesso!', 'success');
+    renderSettings();
+  };
+  reader.readAsDataURL(file);
+}
+
+function removerLogo() {
+  if (!confirm('Remover a logo?')) return;
+  db.settings.logoBase64 = '';
+  salvar();
+  updateTopbarLogo();
+  renderSettings();
+  toast('Logo removida.', 'success');
+}
+
+function updateTopbarLogo() {
+  const wrap = document.getElementById('topbar-logo-wrap');
+  if (!wrap) return;
+  if (db.settings.logoBase64) {
+    wrap.innerHTML = `<img src="${db.settings.logoBase64}" style="height:36px;max-width:140px;object-fit:contain;vertical-align:middle">`;
+  } else {
+    wrap.innerHTML = `<span class="badge-empresa" style="font-size:1.1rem;font-weight:800;letter-spacing:-0.3px">🏗️ AlumiCraft</span>`;
+  }
+}
+
+function getLogoForPrint() {
+  if (db.settings && db.settings.logoBase64) {
+    return `<img src="${db.settings.logoBase64}" style="max-height:65px;max-width:220px;object-fit:contain;display:block;margin-bottom:4px">`;
+  }
+  return `<div style="font-size:22px;font-weight:900;color:#1a5fa8;letter-spacing:-0.5px;line-height:1">AlumiCraft</div>`;
+}
+
+function getCompanyBlock() {
+  const s = db.settings || {};
+  let lines = [];
+  if (s.companyPhone) lines.push(`<span>📞 ${s.companyPhone}</span>`);
+  if (s.companyEmail) lines.push(`<span>✉️ ${s.companyEmail}</span>`);
+  if (s.companyAddress) lines.push(`<span>📍 ${s.companyAddress}</span>`);
+  return lines.map(l=>`<p style="font-size:11.5px;color:#6b7a99;margin:2px 0;line-height:1.5">${l}</p>`).join('');
+}
+
 function gatewayHint(g) {
   const hints = {
     stripe_netlify: '⚡ <strong>Stripe via Netlify</strong> — Melhor opção! Taxa 2.9% + $0.30. O valor de cada invoice é pré-preenchido automaticamente no checkout. Siga o guia de 5 passos abaixo.',
@@ -1741,9 +1936,11 @@ function salvarSettings() {
     financingAPR: parseFloat(document.getElementById('cfg-financingAPR').value) || 18,
     companyPhone: document.getElementById('cfg-phone').value.trim(),
     companyEmail: document.getElementById('cfg-email').value.trim(),
-    companyAddress: document.getElementById('cfg-address').value.trim()
+    companyAddress: document.getElementById('cfg-address').value.trim(),
+    logoBase64: db.settings.logoBase64 || ''
   };
   salvar();
+  updateTopbarLogo();
   toast('Configurações salvas!', 'success');
 }
 
@@ -2675,6 +2872,7 @@ window.addEventListener('beforeinstallprompt', e => {
 // ===== INIT =====
 carregar();
 checkAuth();
+updateTopbarLogo();
 </script>
 </body>
 </html>
