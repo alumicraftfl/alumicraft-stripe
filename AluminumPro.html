@@ -1309,7 +1309,7 @@ function imprimirOrc(id) {
     <p>Gutters · Soffit · Pool Cage · Carport · Railing · Screen Enclosure</p>
     <p style="margin-top:4px">Acceptance of this estimate authorizes AlumiCraft to proceed with the described work.</p>
   </div>
-  <script>window.onload=()=>window.print()<\/script></body></html>\`);win.document.close();
+  <script>window.onload=()=>window.print()<\/script></body></html>`);win.document.close();
 }
 
 // ===== ORDENS DE SERVIÇO =====
@@ -1476,7 +1476,7 @@ function imprimirOS(id) {
     <p>Gutters · Soffit · Pool Cage · Carport · Railing · Screen Enclosure</p>
     <p style="margin-top:4px">This document authorizes AlumiCraft to perform the services described above.</p>
   </div>
-  <script>window.onload=()=>window.print()<\/script></body></html>\`);
+  <script>window.onload=()=>window.print()<\/script></body></html>`);
   win.document.close();
 }
 
@@ -1817,7 +1817,7 @@ function imprimirInvoice(id) {
     <p>Gutters · Soffit · Pool Cage · Carport · Railing · Screen Enclosure</p>
     <p style="margin-top:4px">Thank you for your business! Please reference the invoice number with your payment.</p>
   </div>
-  <script>window.onload=()=>window.print()<\/script></body></html>\`);
+  <script>window.onload=()=>window.print()<\/script></body></html>`);
   win.document.close();
 }
 
@@ -3035,7 +3035,7 @@ let leadsFiltroFonte = '', leadsFiltroCamp = '';
 
 function renderLeads() {
   const totalLeads = db.leads.length;
-  const new = db.leads.filter(l=>l.status==='New').length;
+  const newLeads = db.leads.filter(l=>l.status==='New').length;
   const convertidos = db.leads.filter(l=>l.status==='Converted').length;
   const perdidos = db.leads.filter(l=>l.status==='Lost').length;
   const taxaConv = totalLeads>0 ? ((convertidos/totalLeads)*100).toFixed(1) : '0.0';
@@ -3049,7 +3049,7 @@ function renderLeads() {
 
   document.getElementById('content').innerHTML = `
     <div class="cards-grid">
-      <div class="card"><div class="card-label">Total Leads</div><div class="card-value">${totalLeads}</div><div class="card-sub">${new} new hoje</div></div>
+      <div class="card"><div class="card-label">Total Leads</div><div class="card-value">${totalLeads}</div><div class="card-sub">${newLeads} new today</div></div>
       <div class="card yellow"><div class="card-label">In Progress</div><div class="card-value">${totalLeads-convertidos-perdidos}</div><div class="card-sub">no funil</div></div>
       <div class="card green"><div class="card-label">Convertidos</div><div class="card-value">${convertidos}</div><div class="card-sub">${taxaConv}% taxa</div></div>
       <div class="card red"><div class="card-label">Perdidos</div><div class="card-value">${perdidos}</div></div>
