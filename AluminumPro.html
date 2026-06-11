@@ -696,6 +696,7 @@ function renderInvoices() {
             <button class="btn btn-sm btn-outline" onclick="abrirModalInvoice(${i.id})">✏️</button>
             <button class="btn btn-sm btn-gray" onclick="imprimirInvoice(${i.id})">🖨️</button>
             ${i.status!=='Pago'?`<button class="btn btn-sm" style="background:#0ea5e9;color:#fff" onclick="abrirPagamento(${i.id})">💳 Pay Now</button>`:''}
+            ${i.status!=='Pago'&&db.settings.gateway==='stripe_netlify'?`<button class="btn btn-sm" style="background:#8b5cf6;color:#fff" title="Copiar link de pagamento Stripe" onclick="gerarLinkPagamento(${i.id})">📋 Link</button>`:''}
             ${i.status!=='Pago'?`<button class="btn btn-sm btn-success" onclick="marcarPago(${i.id})">✅ Pago</button>`:''}
             <button class="btn btn-sm btn-danger" onclick="deletarInvoice(${i.id})">🗑️</button>
           </div></td></tr>`).join('')}</tbody>
@@ -807,7 +808,7 @@ function imprimirInvoice(id) {
     </div>
   </div>
   ${inv.notas?`<div class="notes-box"><h4>Notes / Terms</h4><p>${inv.notas}</p></div>`:''}
-  ${(()=>{const pl=db.settings?.paymentLink||''; if(!pl) return ''; const u=pl.startsWith('http')?pl:'https://'+pl; return `<div style="background:#f0f9ff;border:2px solid #0ea5e9;border-radius:10px;padding:16px 20px;margin-bottom:20px;text-align:center"><p style="margin:0 0 6px;font-size:13px;color:#0369a1;font-weight:600">💳 Pay Online – Secure Card Payment</p><p style="margin:0;font-size:12px;color:#0369a1;word-break:break-all"><a href="${u}" style="color:#0369a1">${u}</a></p></div>`;})()}
+  ${inv.stripePayLink&&inv.status!=='Pago'?`<div style="background:linear-gradient(135deg,#635bff12,#635bff06);border:2px solid #635bff50;border-radius:12px;padding:18px 20px;margin-bottom:20px;text-align:center"><p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#635bff">⚡ PAY ONLINE — SECURE STRIPE CHECKOUT</p><p style="margin:0 0 10px;font-size:11px;color:#6b7a99">Pay $ ${parseFloat(inv.total||0).toFixed(2)} securely with Visa, Mastercard, Apple Pay or Google Pay</p><a href="${inv.stripePayLink}" style="display:inline-block;background:#635bff;color:#fff;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">💳 Click Here to Pay — $ ${parseFloat(inv.total||0).toFixed(2)}</a><p style="margin:10px 0 0;font-size:9px;color:#a0aab4;word-break:break-all">${inv.stripePayLink}</p></div>`:(()=>{const pl=db.settings?.paymentLink||''; if(!pl) return ''; const u=pl.startsWith('http')?pl:'https://'+pl; return `<div style="background:#f0f9ff;border:2px solid #0ea5e9;border-radius:10px;padding:16px 20px;margin-bottom:20px;text-align:center"><p style="margin:0 0 6px;font-size:13px;color:#0369a1;font-weight:600">💳 Pay Online – Secure Card Payment</p><p style="margin:0;font-size:12px;color:#0369a1;word-break:break-all"><a href="${u}" style="color:#0369a1">${u}</a></p></div>`;})()}
   <div class="footer"><p>Thank you for your business! | ${num} | AlumiCraft – Aluminum Industry</p><p style="margin-top:4px">Please reference the invoice number with your payment.</p></div>
   <script>window.onload=()=>window.print()<\/script></body></html>`);
   win.document.close();
@@ -908,6 +909,49 @@ async function processarPagamentoStripe(invId) {
     if(btn){ btn.disabled=false; btn.textContent='⚡ Abrir Checkout Stripe'; }
     toast('Erro ao conectar ao Stripe: ' + err.message, 'error');
     console.error('Stripe error:', err, '| URL usada:', STRIPE_FUNCTION_URL);
+  }
+}
+
+async function gerarLinkPagamento(invId) {
+  const inv = db.invoices.find(x=>x.id==invId); if(!inv) return;
+  const c = db.clientes.find(x=>x.id==inv.clienteId);
+  const s = db.settings;
+  toast('⏳ Gerando link de pagamento...', 'info');
+  const isNetlify = window.location.hostname.includes('netlify.app') || window.location.hostname.includes('alumicraft');
+  const STRIPE_FUNCTION_URL = isNetlify
+    ? '/.netlify/functions/create-checkout'
+    : (s.stripeFunction || 'https://alumicraft-stripe.netlify.app/.netlify/functions/create-checkout');
+  try {
+    const resp = await fetch(STRIPE_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount:      inv.total,
+        invoiceId:   inv.id,
+        invoiceNum:  invNumero(inv),
+        clientName:  c?.nome || '',
+        clientEmail: c?.email || '',
+        servico:     servicoLabel(inv.servico),
+        successUrl:  'https://alumicraft-stripe.netlify.app/aluminumpro.html?paid=' + inv.id,
+        cancelUrl:   'https://alumicraft-stripe.netlify.app/aluminumpro.html'
+      })
+    });
+    const data = await resp.json();
+    if(data.error) throw new Error(data.error);
+    // Salva o link na invoice
+    const idx = db.invoices.findIndex(x=>x.id==invId);
+    if(idx>=0){ db.invoices[idx].stripePayLink = data.url; db.invoices[idx].stripeSessionId = data.sessionId; salvar(); }
+    // Copia para o clipboard
+    try {
+      await navigator.clipboard.writeText(data.url);
+      toast('📋 Link copiado! Cole no email ou WhatsApp para o cliente pagar.', 'success');
+    } catch(e) {
+      // Fallback se clipboard bloqueado
+      const box = prompt('Link de pagamento (selecione e copie):', data.url);
+    }
+  } catch(err) {
+    toast('Erro ao gerar link: ' + err.message, 'error');
+    console.error('Stripe link error:', err);
   }
 }
 
