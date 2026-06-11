@@ -196,8 +196,8 @@
   /* ===== LOGIN / AUTH ===== */
   #login-overlay{display:none;position:fixed;inset:0;z-index:9999;background:radial-gradient(ellipse at 30% 40%,#0d1f3c 0%,#040810 100%);justify-content:center;align-items:center;flex-direction:column}
   #login-overlay.show{display:flex}
-  .login-box{background:#0b1525;border-radius:16px;padding:40px 44px;width:100%;max-width:400px;box-shadow:0 30px 80px rgba(0,0,0,.8);animation:faofUp .3s ease;border:1px solid #1d3050}
-  @keyframes faofUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .login-box{background:#0b1525;border-radius:16px;padding:40px 44px;width:100%;max-width:400px;box-shadow:0 30px 80px rgba(0,0,0,.8);animation:fadeUp .3s ease;border:1px solid #1d3050}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
   .login-logo{text-align:center;margin-bottom:20px}
   .login-logo img{height:60px;object-fit:contain}
   .login-brand{font-size:1.7rem;font-weight:800;color:#00b4ff;margin-top:6px}
@@ -563,7 +563,7 @@ const SESSION_KEY = 'aluminumpro_session';
 
 function hashPass(p) {
   let h = 2166136261 >>> 0;
-  for(let i=0;i<p.length;i++){ h ^= p.charCoofAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  for(let i=0;i<p.length;i++){ h ^= p.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
   return h.toString(36);
 }
 
@@ -787,7 +787,7 @@ function salvarUsuario() {
   if(!nome||!username){ toast('Preencha nome e usuário.','error'); return; }
   if(!/^[a-z0-9._]+$/.test(username)){ toast('Usuário: use apenas letras, números, ponto ou underscore.','error'); return; }
   const dup = db.users.find(u=>u.username===username && u.id!==uid);
-  if(dup){ toast('Este nome of usuário já existe.','error'); return; }
+  if(dup){ toast('Este nome de usuário já existe.','error'); return; }
   if(uid){
     const idx=db.users.findIndex(u=>u.id===uid);
     if(idx<0) return;
@@ -806,7 +806,7 @@ function salvarUsuario() {
     toast('User updated!','success');
   } else {
     if(!senha){ toast('Informe uma senha.','error'); return; }
-    if(senha.length<4){ toast('Senha ofve ter ao menos 4 caracteres.','error'); return; }
+    if(senha.length<4){ toast('Senha deve ter ao menos 4 caracteres.','error'); return; }
     db.users.push({
       id:db._id.users++, nome, username,
       password:hashPass(senha), isAdmin:false,
@@ -1148,7 +1148,7 @@ function imprimirOrc(id) {
   <div class="footer">
     <p><strong>AlumiCraft – Aluminum Industry</strong> | Estimate #EST-${String(o.id).padStart(4,'0')}</p>
     <p>Gutters · Soffit · Pool Cage · Carport · Railing · Screen Enclosure</p>
-    <p style="margin-top:4px">Acceptance of this estimate authorizes AlumiCraft to proceed with the ofscribed work.</p>
+    <p style="margin-top:4px">Acceptance of this estimate authorizes AlumiCraft to proceed with the described work.</p>
   </div>
   <script>window.onload=()=>window.print()<\/script></body></html>\`);win.document.close();
 }
@@ -1315,7 +1315,7 @@ function imprimirOS(id) {
   <div class="footer">
     <p><strong>AlumiCraft – Aluminum Industry</strong> | Work Order #WO-${String(o.id).padStart(4,'0')}</p>
     <p>Gutters · Soffit · Pool Cage · Carport · Railing · Screen Enclosure</p>
-    <p style="margin-top:4px">This document authorizes AlumiCraft to perform the services ofscribed above.</p>
+    <p style="margin-top:4px">This document authorizes AlumiCraft to perform the services described above.</p>
   </div>
   <script>window.onload=()=>window.print()<\/script></body></html>\`);
   win.document.close();
