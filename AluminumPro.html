@@ -1020,7 +1020,7 @@ function renderSettings() {
               ['1','Acesse <a href="https://github.com" target="_blank" style="color:#635bff">github.com</a> → crie conta gratuita → clique <strong>New repository</strong> → nome: <code>alumicraft-stripe</code> → <strong>Create</strong>'],
               ['2','Dentro do repositório, clique <strong>Add file → Create new file</strong>. Crie os 3 arquivos que estão na pasta <code>alumicraft-stripe</code> que o app gerou para você'],
               ['3','Acesse <a href="https://netlify.com" target="_blank" style="color:#635bff">netlify.com</a> → <strong>Add new site → Import from Git</strong> → conecte seu GitHub → selecione <code>alumicraft-stripe</code> → <strong>Deploy</strong>'],
-              ['4','No painel do Netlify → <strong>Site configuration → Environment variables → Add variable</strong>:<br>Key: <code>STRIPE_SECRET_KEY</code> &nbsp; Value: sua chave <code>sk_live_...</code> do Stripe'],
+              ['4','No painel do Netlify → <strong>Site configuration → Environment variables → Add variable</strong>:<br>Key: <code>STRIPE_SECRET_KEY</code> &nbsp; Value: sua chave secreta do Stripe (começa com sk_)'],
               ['5','Ainda no Netlify → <strong>Deploys → Trigger deploy</strong>. Depois copie a URL do site (ex: <code>alumicraft-stripe.netlify.app</code>) e cole aqui:<br><code>https://alumicraft-stripe.netlify.app/.netlify/functions/create-checkout</code>']
             ].map(([n,t])=>`<div style="display:flex;gap:10px;align-items:flex-start">
               <span style="min-width:22px;height:22px;background:#635bff;color:#fff;border-radius:50%;font-size:.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px">${n}</span>
