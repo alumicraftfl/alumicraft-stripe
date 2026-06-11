@@ -569,6 +569,15 @@ function goToCliente(id) { showPage('clientes');  if(id) setTimeout(()=>abrirMod
 function goToAgenda()    { showPage('agenda'); }
 
 
+
+// ===== FIREBASE CONFIG (pre-configured - do not edit) =====
+const FIREBASE_CONFIG = {
+  cloudEnabled: true,
+  cloudApiKey: 'AIzaSyDDQmK4SBSdw-4vf1CPfHOXyVDSfI0thK4',
+  cloudProjectId: 'alumicraft-app',
+  cloudCompanyId: 'alumicraft-main'
+};
+
 // ===== CLOUD SYNC (Firebase Firestore) =====
 window._syncEnabled = false;
 window._syncBusy    = false;
@@ -577,30 +586,36 @@ window._fbDb  = null;
 
 function cloudConfigured() {
   const s = db.settings || {};
-  return !!(s.cloudEnabled && s.cloudProjectId && s.cloudApiKey && s.cloudCompanyId);
+  return !!(
+    (s.cloudEnabled && s.cloudProjectId && s.cloudApiKey && s.cloudCompanyId) ||
+    FIREBASE_CONFIG.cloudEnabled
+  );
+}
+
+function getCloudConfig() {
+  const s = db.settings || {};
+  if(s.cloudEnabled && s.cloudProjectId && s.cloudApiKey && s.cloudCompanyId) return s;
+  return FIREBASE_CONFIG;
 }
 
 async function fbMods() {
   const base = 'https://www.gstatic.com/firebasejs/10.12.0';
-  const [a,f,au] = await Promise.all([
+  const [a,f] = await Promise.all([
     import(base+'/firebase-app.js'),
-    import(base+'/firebase-firestore.js'),
-    import(base+'/firebase-auth.js')
+    import(base+'/firebase-firestore.js')
   ]);
-  return {...a,...f,...au};
+  return {...a,...f};
 }
 
 async function initFirebase(cfg) {
   try {
-    const s = cfg || db.settings || {};
+    const s = cfg || getCloudConfig();
     if(!s.cloudProjectId || !s.cloudApiKey) return false;
     const fb = await fbMods();
     const fcfg = { apiKey:s.cloudApiKey, authDomain:`${s.cloudProjectId}.firebaseapp.com`, projectId:s.cloudProjectId };
     try { window._fbApp = fb.initializeApp(fcfg,'alumicraft'); }
     catch(e){ if(e.code==='app/duplicate-app') window._fbApp=fb.getApp('alumicraft'); else throw e; }
     window._fbDb = fb.getFirestore(window._fbApp);
-    const auth = fb.getAuth(window._fbApp);
-    await fb.signInAnonymously(auth);
     window._syncEnabled = true;
     return true;
   } catch(e) { console.error('[Cloud] init:',e); window._syncEnabled=false; return false; }
@@ -613,7 +628,7 @@ async function syncToCloud() {
   setSyncBadge('syncing');
   try {
     const fb = await fbMods();
-    const cid = (db.settings||{}).cloudCompanyId;
+    const cid = getCloudConfig().cloudCompanyId;
     const ref = fb.doc(window._fbDb,'alumicraft',cid);
     const copy = JSON.parse(JSON.stringify(db));
     const logo = copy.settings?.logoBase64||'';
@@ -632,7 +647,7 @@ async function syncToCloud() {
 
 async function syncFromCloud(companyId, fbDb) {
   const fdb = fbDb||window._fbDb;
-  const cid = companyId||(db.settings||{}).cloudCompanyId;
+  const cid = companyId||getCloudConfig().cloudCompanyId;
   if(!fdb||!cid) return false;
   try {
     const fb = await fbMods();
@@ -3345,7 +3360,7 @@ window.addEventListener('beforeinstallprompt', e => {
 // ===== INIT =====
 carregar();
 (async function startApp(){
-  if(cloudConfigured()){
+  if(cloudConfigured()){ if(!db.settings?.cloudApiKey){ db.settings=db.settings||{}; Object.assign(db.settings,FIREBASE_CONFIG); salvarLocal(); }
     try {
       const ok = await initFirebase();
       if(ok){
