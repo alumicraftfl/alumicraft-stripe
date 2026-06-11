@@ -345,6 +345,88 @@
     #content { padding: 12px 10px; }
   }
 
+
+/* ─── AGENDA / CALENDÁRIO ─────────────────────────── */
+.agenda-nav {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 0 8px; justify-content: center;
+}
+.agenda-nav h3 { min-width: 220px; text-align: center; }
+
+.agenda-legenda {
+  display: flex; gap: 16px; padding: 8px 0 12px;
+  justify-content: center; flex-wrap: wrap;
+}
+.leg-item { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; }
+.leg-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+.calendario {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 4px; padding-bottom: 16px;
+}
+.cal-header {
+  text-align: center; font-weight: 700; font-size: 0.8rem;
+  color: var(--text-muted); padding: 6px 0;
+}
+.cal-empty { min-height: 90px; }
+.cal-cell {
+  min-height: 90px; border-radius: 8px;
+  background: var(--panel-inner-bg, rgba(255,255,255,0.03));
+  border: 1px solid var(--border);
+  padding: 4px; cursor: default; overflow: hidden;
+  transition: border-color .2s;
+}
+.cal-cell:hover { border-color: var(--accent); }
+.cal-hoje { border-color: var(--accent) !important; border-width: 2px; }
+.cal-day-num {
+  font-size: 0.82rem; font-weight: 600; color: var(--text-muted);
+  padding: 2px 4px; border-radius: 4px; display: inline-block;
+  line-height: 1;
+}
+.cal-day-num.cal-has-os { color: var(--text); }
+.cal-hoje .cal-day-num {
+  background: var(--accent); color: #fff;
+  border-radius: 50%; width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+}
+.cal-os-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.cal-os-card {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 3px 5px; border-radius: 4px;
+  cursor: pointer; color: #fff; font-size: 0.7rem;
+  line-height: 1.3; transition: opacity .15s;
+}
+.cal-os-card:hover { opacity: 0.85; }
+.cal-os-num { font-weight: 700; }
+.cal-os-nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-os-hora { opacity: 0.85; }
+
+/* Lista de Agenda */
+.agenda-lista { display: flex; flex-direction: column; gap: 16px; }
+.agenda-grupo { display: flex; flex-direction: column; gap: 6px; }
+.agenda-data-header {
+  font-weight: 700; font-size: 0.9rem;
+  color: var(--text-muted); text-transform: capitalize;
+  border-bottom: 1px solid var(--border); padding-bottom: 6px;
+  display: flex; align-items: center; gap: 8px;
+}
+.agenda-data-header.agenda-hoje { color: var(--accent); }
+.badge-hoje {
+  background: var(--accent); color: #fff;
+  font-size: 0.7rem; padding: 1px 7px; border-radius: 20px;
+}
+.agenda-item {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--panel-inner-bg, rgba(255,255,255,0.03));
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 16px; cursor: pointer; transition: border-color .2s, transform .15s;
+}
+.agenda-item:hover { border-color: var(--accent); transform: translateX(3px); }
+.agenda-item-cor { width: 4px; min-height: 40px; border-radius: 4px; flex-shrink: 0; }
+.agenda-item-info { flex: 1; }
+.agenda-item-title { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.agenda-item-sub { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
+.agenda-hora { font-size: 0.82rem; color: var(--text-muted); font-weight: 400; }
 </style>
 </head>
 <body>
@@ -384,6 +466,7 @@
     <a onclick="showPage('clientes')" id="nav-clientes"><span class="icon">👥</span> Clientes</a>
     <a onclick="showPage('orcamentos')" id="nav-orcamentos"><span class="icon">📋</span> Orçamentos</a>
     <a onclick="showPage('ordens')" id="nav-ordens"><span class="icon">🔧</span> Ordens de Serviço</a>
+    <a onclick="showPage('agenda')" id="nav-agenda"><span class="icon">📅</span> Agenda</a>
     <a onclick="showPage('invoices')" id="nav-invoices"><span class="icon">🧾</span> Invoices</a>
     <a onclick="showPage('leads')" id="nav-leads"><span class="icon">🎯</span> Leads & Campanhas</a>
     <a onclick="showPage('estoque')" id="nav-estoque"><span class="icon">📦</span> Estoque</a>
@@ -444,7 +527,7 @@ function nextId(col) { const id=db._id[col]++; salvar(); return id; }
 // ===== NAVEGAÇÃO =====
 let paginaAtual = 'dashboard';
 const PAGE_TITLES = { dashboard:'Dashboard', clientes:'Clientes', orcamentos:'Orçamentos', ordens:'Ordens de Serviço', invoices:'Invoices', leads:'Leads & Campanhas', estoque:'Estoque de Materiais', financeiro:'Financeiro', settings:'Configurações', usuarios:'Gerenciar Usuários' };
-const PAGE_RENDERS = { dashboard:renderDashboard, clientes:renderClientes, orcamentos:renderOrcamentos, ordens:renderOrdens, invoices:renderInvoices, leads:renderLeads, estoque:renderEstoque, financeiro:renderFinanceiro, settings:renderSettings, usuarios:renderUsuarios };
+const PAGE_RENDERS = { dashboard:renderDashboard, clientes:renderClientes, orcamentos:renderOrcamentos, ordens:renderOrdens, agenda:renderAgenda, invoices:renderInvoices, leads:renderLeads, estoque:renderEstoque, financeiro:renderFinanceiro, settings:renderSettings, usuarios:renderUsuarios };
 
 function showPage(page) {
   if(!canAccess(page)){ toast('⛔ Acesso não autorizado!','error'); return; }
@@ -954,7 +1037,7 @@ function salvarOrc(id) {
   salvarAnexosPendentes('orc',orcFinalId).then(()=>{if(_pendingAnexos.length===0)renderOrcamentos();});
 }
 function deletarOrc(id){if(!confirm('Deletar orçamento?'))return;db.orcamentos=db.orcamentos.filter(x=>x.id!=id);salvar();renderOrcamentos();}
-function criarOrdemDeOrc(orcId){const orc=db.orcamentos.find(x=>x.id==orcId);if(!orc)return;const ord={id:nextId('ordens'),clienteId:orc.clienteId,orcamentoId:orc.id,servico:orc.servico,status:'Agendado',dataInicio:today(),dataFim:'',tecnico:'',obs:orc.descricao||''};db.ordens.push(ord);salvar();showPage('ordens');toast('Ordem criada!','success');}
+function criarOrdemDeOrc(orcId){const orc=db.orcamentos.find(x=>x.id==orcId);if(!orc)return;const ord={id:nextId('ordens'),clienteId:orc.clienteId,orcamentoId:orc.id,servico:orc.servico,status:'Agendado',dataAgendada:today(),horaAgendada:'08:00',dataInicio:today(),dataFim:'',tecnico:'',obs:orc.descricao||''};db.ordens.push(ord);salvar();showPage('ordens');toast('Ordem criada!','success');}
 
 function imprimirOrc(id) {
   const o=db.orcamentos.find(x=>x.id==id); if(!o)return;
@@ -1053,6 +1136,7 @@ function imprimirOrc(id) {
 
 // ===== ORDENS DE SERVIÇO =====
 let ordFiltro='',ordStatusFiltro='';
+let agendaView='month', agendaDate=new Date();
 function renderOrdens() {
   let lista=db.ordens.filter(o=>(!ordFiltro||clienteNome(o.clienteId).toLowerCase().includes(ordFiltro.toLowerCase())||(o.tecnico||'').toLowerCase().includes(ordFiltro.toLowerCase()))&&(!ordStatusFiltro||o.status===ordStatusFiltro)).sort((a,b)=>b.id-a.id);
   document.getElementById('content').innerHTML=`
@@ -1066,11 +1150,11 @@ function renderOrdens() {
         </select>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>Cliente</th><th>Serviço</th><th>Técnico</th><th>Início</th><th>Fim</th><th>Status</th><th>Ações</th></tr></thead>
+        <thead><tr><th>#</th><th>Cliente</th><th>Serviço</th><th>Técnico</th><th>📅 Agendada</th><th>Início</th><th>Fim</th><th>Status</th><th>Ações</th></tr></thead>
         <tbody>${lista.length===0?'<tr class="empty-row"><td colspan="8">Nenhuma ordem</td></tr>':lista.map(o=>`<tr>
           <td><strong>#${o.id}</strong>${o.orcamentoId?`<br><span class="text-muted">Orc #${o.orcamentoId}</span>`:''}</td>
           <td>${clienteNome(o.clienteId)}</td><td>${servicoLabel(o.servico)}</td><td>${o.tecnico||'-'}</td>
-          <td>${fmtDate(o.dataInicio)}</td><td>${fmtDate(o.dataFim)||'-'}</td><td>${statusBadge(o.status)}</td>
+          <td><strong>${fmtDate(o.dataAgendada||o.dataInicio)}</strong>${o.horaAgendada?'<br><small>'+o.horaAgendada+'</small>':''}</td><td>${fmtDate(o.dataInicio)}</td><td>${fmtDate(o.dataFim)||'-'}</td><td>${statusBadge(o.status)}</td>
           <td><div class="flex-gap">
             ${(o.attachments||[]).length?`<span class="anexo-badge">📎 ${(o.attachments||[]).length}</span>`:''}
             <button class="btn btn-sm btn-outline" onclick="abrirModalOrdem(${o.id})">✏️</button>
@@ -1093,6 +1177,8 @@ function abrirModalOrdem(id) {
       <div class="form-group"><label>Orçamento vinculado</label><select id="f-orcId"><option value="">Nenhum</option>${orcOpts}</select></div>
       <div class="form-group"><label>Serviço</label>${servicoSelect('f-servico',o?.servico)}</div>
       <div class="form-group"><label>Técnico</label><input id="f-tec" value="${o?.tecnico||''}" placeholder="Nome do técnico"></div>
+      <div class="form-group"><label>📅 Data Agendada *</label><input type="date" id="f-dataAgendada" value="${o?.dataAgendada||today()}" required></div>
+      <div class="form-group"><label>🕐 Hora Agendada</label><input type="time" id="f-horaAgendada" value="${o?.horaAgendada||'08:00'}"></div>
       <div class="form-group"><label>Data Início</label><input type="date" id="f-dataInicio" value="${o?.dataInicio||today()}"></div>
       <div class="form-group"><label>Data Término</label><input type="date" id="f-dataFim" value="${o?.dataFim||''}"></div>
       <div class="form-group span2"><label>Status</label><select id="f-status">
@@ -1109,7 +1195,8 @@ function abrirModalOrdem(id) {
 
 function salvarOrdem(id) {
   const clienteId=document.getElementById('f-clienteId').value; if(!clienteId){alert('Selecione cliente!');return;}
-  const obj={clienteId:parseInt(clienteId),orcamentoId:parseInt(document.getElementById('f-orcId').value)||null,servico:document.getElementById('f-servico').value,tecnico:document.getElementById('f-tec').value,dataInicio:document.getElementById('f-dataInicio').value,dataFim:document.getElementById('f-dataFim').value,status:document.getElementById('f-status').value,obs:document.getElementById('f-obs').value};
+  const dataAgendada=document.getElementById('f-dataAgendada').value; if(!dataAgendada){alert('Data Agendada é obrigatória!');return;}
+  const obj={clienteId:parseInt(clienteId),orcamentoId:parseInt(document.getElementById('f-orcId').value)||null,servico:document.getElementById('f-servico').value,tecnico:document.getElementById('f-tec').value,dataAgendada,horaAgendada:document.getElementById('f-horaAgendada').value||'08:00',dataInicio:document.getElementById('f-dataInicio').value,dataFim:document.getElementById('f-dataFim').value,status:document.getElementById('f-status').value,obs:document.getElementById('f-obs').value};
   let ordFinalId=id;
   if(id){const i=db.ordens.findIndex(x=>x.id==id);if(i>=0)db.ordens[i]={...db.ordens[i],...obj};}else{obj.id=nextId('ordens');obj.attachments=[];db.ordens.push(obj);ordFinalId=obj.id;}
   salvar();fecharModal();renderOrdens();toast(id?'Ordem atualizada!':'Ordem criada!','success');
@@ -1239,6 +1326,124 @@ function gerarInvoiceDeOS(osId) {
 
 // ===== INVOICES =====
 let invFiltro='',invStatusFiltro='';
+
+function renderAgenda() {
+  document.getElementById('content').innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <h2>📅 Agenda</h2>
+        <div class="flex-gap">
+          <button class="btn ${agendaView==='month'?'btn-primary':'btn-outline'}" onclick="agendaView='month';renderAgenda()">📅 Mês</button>
+          <button class="btn ${agendaView==='list'?'btn-primary':'btn-outline'}" onclick="agendaView='list';renderAgenda()">📋 Lista</button>
+        </div>
+      </div>
+      ${agendaView==='month' ? renderAgendaMes() : renderAgendaLista()}
+    </div>`;
+}
+
+function renderAgendaMes() {
+  const ano = agendaDate.getFullYear();
+  const mes = agendaDate.getMonth();
+  const nomeMes = agendaDate.toLocaleString('pt-BR',{month:'long',year:'numeric'});
+  const primeiroDia = new Date(ano, mes, 1).getDay();
+  const diasNoMes = new Date(ano, mes+1, 0).getDate();
+  const hoje = today();
+
+  // Build map: date string → array of OS
+  const osMap = {};
+  db.ordens.forEach(o => {
+    const d = o.dataAgendada || o.dataInicio;
+    if (!d) return;
+    if (!osMap[d]) osMap[d] = [];
+    osMap[d].push(o);
+  });
+
+  const diasSemana = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  let cells = '';
+
+  // Empty cells before first day
+  for (let i = 0; i < primeiroDia; i++) cells += '<div class="cal-cell cal-empty"></div>';
+
+  for (let d = 1; d <= diasNoMes; d++) {
+    const dateStr = `${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isHoje = dateStr === hoje;
+    const osDia = osMap[dateStr] || [];
+    const osCards = osDia.map(o => {
+      const stColors = {
+        'Agendado':'#3b82f6','Em Andamento':'#f59e0b','Concluído':'#10b981','Cancelado':'#ef4444','Pendente':'#8b5cf6'
+      };
+      const cor = stColors[o.status] || '#6b7280';
+      return `<div class="cal-os-card" style="background:${cor}" onclick="abrirModalOrdem(${o.id})" title="${clienteNome(o.clienteId)} - ${servicoLabel(o.servico)}">
+        <span class="cal-os-num">#${o.id}</span>
+        <span class="cal-os-nome">${clienteNome(o.clienteId).split(' ')[0]}</span>
+        ${o.horaAgendada ? `<span class="cal-os-hora">${o.horaAgendada}</span>` : ''}
+      </div>`;
+    }).join('');
+    cells += `<div class="cal-cell ${isHoje?'cal-hoje':''}">
+      <div class="cal-day-num ${osDia.length?'cal-has-os':''}">${d}</div>
+      <div class="cal-os-list">${osCards}</div>
+    </div>`;
+  }
+
+  return `
+    <div class="agenda-nav">
+      <button class="btn btn-outline" onclick="agendaDate=new Date(agendaDate.getFullYear(),agendaDate.getMonth()-1,1);renderAgenda()">◀ Anterior</button>
+      <h3 style="margin:0;text-transform:capitalize">${nomeMes}</h3>
+      <button class="btn btn-outline" onclick="agendaDate=new Date(agendaDate.getFullYear(),agendaDate.getMonth()+1,1);renderAgenda()">Próximo ▶</button>
+      <button class="btn btn-gray" onclick="agendaDate=new Date();renderAgenda()">Hoje</button>
+    </div>
+    <div class="agenda-legenda">
+      <span class="leg-item"><span class="leg-dot" style="background:#3b82f6"></span>Agendado</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>Em Andamento</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Concluído</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Cancelado</span>
+    </div>
+    <div class="calendario">
+      ${diasSemana.map(d=>`<div class="cal-header">${d}</div>`).join('')}
+      ${cells}
+    </div>`;
+}
+
+function renderAgendaLista() {
+  const osComData = db.ordens.filter(o => o.dataAgendada || o.dataInicio)
+    .map(o => ({...o, _data: o.dataAgendada || o.dataInicio}))
+    .sort((a,b) => a._data.localeCompare(b._data));
+
+  if (!osComData.length) return '<div class="empty-state">Nenhuma ordem agendada</div>';
+
+  // Group by date
+  const grupos = {};
+  osComData.forEach(o => {
+    if (!grupos[o._data]) grupos[o._data] = [];
+    grupos[o._data].push(o);
+  });
+
+  const stColors = {
+    'Agendado':'#3b82f6','Em Andamento':'#f59e0b','Concluído':'#10b981','Cancelado':'#ef4444','Pendente':'#8b5cf6'
+  };
+
+  return '<div class="agenda-lista">' + Object.keys(grupos).sort().map(data => {
+    const osDia = grupos[data];
+    const dataFmt = new Date(data + 'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    const isHoje = data === today();
+    return `<div class="agenda-grupo">
+      <div class="agenda-data-header ${isHoje?'agenda-hoje':''}">${dataFmt}${isHoje?' <span class="badge-hoje">Hoje</span>':''}</div>
+      ${osDia.map(o => `
+        <div class="agenda-item" onclick="abrirModalOrdem(${o.id})">
+          <div class="agenda-item-cor" style="background:${stColors[o.status]||'#6b7280'}"></div>
+          <div class="agenda-item-info">
+            <div class="agenda-item-title">
+              <strong>#${o.id}</strong> — ${clienteNome(o.clienteId)}
+              ${o.horaAgendada?`<span class="agenda-hora">🕐 ${o.horaAgendada}</span>`:''}
+            </div>
+            <div class="agenda-item-sub">${servicoLabel(o.servico)} ${o.tecnico?'• 👷 '+o.tecnico:''}</div>
+          </div>
+          <div>${statusBadge(o.status)}</div>
+        </div>`).join('')}
+    </div>`;
+  }).join('') + '</div>';
+}
+
 function renderInvoices() {
   let lista=db.invoices.filter(i=>(!invFiltro||clienteNome(i.clienteId).toLowerCase().includes(invFiltro.toLowerCase())||invNumero(i).includes(invFiltro))&&(!invStatusFiltro||invStatusAtual(i)===invStatusFiltro)).sort((a,b)=>b.id-a.id);
   const totalAberto=lista.filter(i=>!['Pago','Cancelado'].includes(i.status)).reduce((s,i)=>s+parseFloat(i.total||0),0);
