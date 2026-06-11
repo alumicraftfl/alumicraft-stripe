@@ -217,6 +217,29 @@
   .perm-toggle{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg-input);border-radius:8px;border:1px solid var(--border);cursor:pointer}
   .perm-toggle input[type=checkbox]{width:17px;height:17px;accent-color:#1a5fa8;cursor:pointer;flex-shrink:0}
   .perm-toggle span{font-size:.88rem;color:var(--text);font-weight:500}
+
+  /* ===== ANEXOS / ATTACHMENTS ===== */
+  .anexo-section { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .anexo-section h4 { font-size: .8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin: 0 0 10px; }
+  .anexo-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; min-height: 4px; }
+  .anexo-item { position: relative; }
+  .anexo-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid var(--border); cursor: pointer; display: block; transition: border-color .15s; }
+  .anexo-thumb:hover { border-color: #0066ff; }
+  .anexo-file { width: 80px; height: 80px; background: var(--bg-input); border: 2px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; gap: 3px; transition: border-color .15s; }
+  .anexo-file:hover { border-color: #0066ff; }
+  .anexo-file .af-icon { font-size: 1.5rem; }
+  .anexo-file .af-ext { font-size: .62rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; background: var(--border); padding: 2px 5px; border-radius: 3px; }
+  .anexo-file .af-name { font-size: .62rem; color: var(--text-muted); text-align: center; padding: 0 4px; word-break: break-all; max-height: 24px; overflow: hidden; line-height: 1.2; }
+  .anexo-del { position: absolute; top: -7px; right: -7px; background: #c0392b; color: #fff; border: 2px solid var(--bg-card); border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: .6rem; display: flex; align-items: center; justify-content: center; font-weight: 700; z-index: 2; line-height: 1; padding: 0; }
+  .anexo-del:hover { background: #a93226; }
+  .anexo-add-btn { width: 80px; height: 80px; background: var(--bg-input); border: 2px dashed rgba(0,102,255,.35); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; gap: 3px; transition: all .15s; font-size: .72rem; color: var(--text-muted); }
+  .anexo-add-btn:hover { border-color: #0066ff; color: #0066ff; background: rgba(0,102,255,.06); }
+  .anexo-badge { display: inline-flex; align-items: center; gap: 3px; background: rgba(0,102,255,.15); color: #60aaff; border: 1px solid rgba(0,102,255,.25); border-radius: 10px; padding: 1px 7px; font-size: .7rem; font-weight: 600; }
+  .anexo-pending-border { border-color: #00b4ff !important; }
+  @media (max-width: 768px) {
+    .anexo-thumb, .anexo-file, .anexo-add-btn { width: 68px; height: 68px; }
+  }
+
   @media print { #sidebar, #topbar { display: none; } #main { margin-left: 0; } #content { padding: 10px; } .btn, .search-bar { display: none; } }
   select option { background: #081220; color: #c8d8ee; }
   input::placeholder { color: #2d4a65; }
@@ -858,6 +881,7 @@ function renderOrcamentos() {
           <td><strong>#${o.id}</strong></td><td>${clienteNome(o.clienteId)}</td><td>${servicoLabel(o.servico)}</td>
           <td>${fmtDate(o.data)}</td><td><strong>${fmt(orcTotal(o))}</strong></td><td>${statusBadge(o.status)}</td>
           <td><div class="flex-gap">
+            ${(o.attachments||[]).length?`<span class="anexo-badge">📎 ${(o.attachments||[]).length}</span>`:''}
             <button class="btn btn-sm btn-outline" onclick="abrirModalOrc(${o.id})">✏️</button>
             <button class="btn btn-sm btn-gray" onclick="imprimirOrc(${o.id})">🖨️</button>
             ${o.status==='Aprovado'?`<button class="btn btn-sm btn-success" onclick="criarOrdemDeOrc(${o.id})">➡️ OS</button>`:''}
@@ -869,6 +893,7 @@ function renderOrcamentos() {
 }
 
 function abrirModalOrc(id) {
+  iniciarAnexos();
   const o=id?db.orcamentos.find(x=>x.id==id):null;
   const itens=o?.itens||[{tipo:'gutter',desc:'',qty:1,preco:0}];
   const clientesOpts=db.clientes.map(c=>`<option value="${c.id}" ${o?.clienteId==c.id?'selected':''}>${c.nome}</option>`).join('');
@@ -890,8 +915,9 @@ function abrirModalOrc(id) {
       </select></div>
       <div class="form-group"><label>Desconto ($)</label><input type="number" id="f-desconto" value="${o?.desconto||0}" min="0" step="0.01" oninput="calcTotal()"></div>
       <div class="form-group span2"><label>Observações</label><textarea id="f-descricao">${o?.descricao||''}</textarea></div>
-    </div>${itensHtml}`,
+    </div>${itensHtml}${renderAnexoSection('orc',id||0)}`,
   `<button class="btn btn-gray" onclick="fecharModal()">Cancelar</button><button class="btn btn-primary" onclick="salvarOrc(${id||0})">${o?'Salvar':'Criar'}</button>`,'700px');
+  if(id) setTimeout(()=>loadAnexoThumbs('orc',id),80);
 }
 
 function servicoSelect(id,val) {
@@ -921,8 +947,10 @@ function getItens(){const c=document.getElementById('itens-container');const r=[
 function salvarOrc(id) {
   const clienteId=document.getElementById('f-clienteId').value; if(!clienteId){alert('Selecione cliente!');return;}
   const obj={clienteId:parseInt(clienteId),servico:document.getElementById('f-servico').value,data:document.getElementById('f-data').value,validade:document.getElementById('f-validade').value,status:document.getElementById('f-status').value,desconto:parseFloat(document.getElementById('f-desconto').value||0),descricao:document.getElementById('f-descricao').value,itens:getItens()};
-  if(id){const i=db.orcamentos.findIndex(x=>x.id==id);if(i>=0)db.orcamentos[i]={...db.orcamentos[i],...obj};}else{obj.id=nextId('orcamentos');db.orcamentos.push(obj);}
+  let orcFinalId=id;
+  if(id){const i=db.orcamentos.findIndex(x=>x.id==id);if(i>=0)db.orcamentos[i]={...db.orcamentos[i],...obj};}else{obj.id=nextId('orcamentos');obj.attachments=[];db.orcamentos.push(obj);orcFinalId=obj.id;}
   salvar();fecharModal();renderOrcamentos();toast(id?'Orçamento atualizado!':'Orçamento criado!','success');
+  salvarAnexosPendentes('orc',orcFinalId).then(()=>{if(_pendingAnexos.length===0)renderOrcamentos();});
 }
 function deletarOrc(id){if(!confirm('Deletar orçamento?'))return;db.orcamentos=db.orcamentos.filter(x=>x.id!=id);salvar();renderOrcamentos();}
 function criarOrdemDeOrc(orcId){const orc=db.orcamentos.find(x=>x.id==orcId);if(!orc)return;const ord={id:nextId('ordens'),clienteId:orc.clienteId,orcamentoId:orc.id,servico:orc.servico,status:'Agendado',dataInicio:today(),dataFim:'',tecnico:'',obs:orc.descricao||''};db.ordens.push(ord);salvar();showPage('ordens');toast('Ordem criada!','success');}
@@ -967,6 +995,7 @@ function renderOrdens() {
           <td>${clienteNome(o.clienteId)}</td><td>${servicoLabel(o.servico)}</td><td>${o.tecnico||'-'}</td>
           <td>${fmtDate(o.dataInicio)}</td><td>${fmtDate(o.dataFim)||'-'}</td><td>${statusBadge(o.status)}</td>
           <td><div class="flex-gap">
+            ${(o.attachments||[]).length?`<span class="anexo-badge">📎 ${(o.attachments||[]).length}</span>`:''}
             <button class="btn btn-sm btn-outline" onclick="abrirModalOrdem(${o.id})">✏️</button>
             <button class="btn btn-sm btn-gray" onclick="imprimirOS(${o.id})">🖨️</button>
             <button class="btn btn-sm btn-purple" onclick="gerarInvoiceDeOS(${o.id})">🧾 Invoice</button>
@@ -977,6 +1006,7 @@ function renderOrdens() {
 }
 
 function abrirModalOrdem(id) {
+  iniciarAnexos();
   const o=id?db.ordens.find(x=>x.id==id):null;
   const clientesOpts=db.clientes.map(c=>`<option value="${c.id}" ${o?.clienteId==c.id?'selected':''}>${c.nome}</option>`).join('');
   const orcOpts=db.orcamentos.filter(oc=>oc.status==='Aprovado').map(oc=>`<option value="${oc.id}" ${o?.orcamentoId==oc.id?'selected':''}>#${oc.id} – ${clienteNome(oc.clienteId)}</option>`).join('');
@@ -995,15 +1025,18 @@ function abrirModalOrdem(id) {
         <option value="Cancelado" ${o?.status==='Cancelado'?'selected':''}>Cancelado</option>
       </select></div>
       <div class="form-group span2"><label>Notas</label><textarea id="f-obs">${o?.obs||''}</textarea></div>
-    </div>`,
+    </div>${renderAnexoSection('ordem',id||0)}`,
   `<button class="btn btn-gray" onclick="fecharModal()">Cancelar</button><button class="btn btn-primary" onclick="salvarOrdem(${id||0})">${o?'Salvar':'Criar'}</button>`);
+  if(id) setTimeout(()=>loadAnexoThumbs('ordem',id),80);
 }
 
 function salvarOrdem(id) {
   const clienteId=document.getElementById('f-clienteId').value; if(!clienteId){alert('Selecione cliente!');return;}
   const obj={clienteId:parseInt(clienteId),orcamentoId:parseInt(document.getElementById('f-orcId').value)||null,servico:document.getElementById('f-servico').value,tecnico:document.getElementById('f-tec').value,dataInicio:document.getElementById('f-dataInicio').value,dataFim:document.getElementById('f-dataFim').value,status:document.getElementById('f-status').value,obs:document.getElementById('f-obs').value};
-  if(id){const i=db.ordens.findIndex(x=>x.id==id);if(i>=0)db.ordens[i]={...db.ordens[i],...obj};}else{obj.id=nextId('ordens');db.ordens.push(obj);}
+  let ordFinalId=id;
+  if(id){const i=db.ordens.findIndex(x=>x.id==id);if(i>=0)db.ordens[i]={...db.ordens[i],...obj};}else{obj.id=nextId('ordens');obj.attachments=[];db.ordens.push(obj);ordFinalId=obj.id;}
   salvar();fecharModal();renderOrdens();toast(id?'Ordem atualizada!':'Ordem criada!','success');
+  salvarAnexosPendentes('ordem',ordFinalId).then(()=>{if(_pendingAnexos.length===0)renderOrdens();});
 }
 function deletarOrdem(id){if(!confirm('Deletar ordem?'))return;db.ordens=db.ordens.filter(x=>x.id!=id);salvar();renderOrdens();}
 
@@ -1149,6 +1182,7 @@ function renderInvoices() {
           <td><strong>${fmt(i.total)}</strong></td>
           <td>${statusBadge(invStatusAtual(i))}</td>
           <td><div class="flex-gap">
+            ${(i.attachments||[]).length?`<span class="anexo-badge">📎 ${(i.attachments||[]).length}</span>`:''}
             <button class="btn btn-sm btn-outline" onclick="abrirModalInvoice(${i.id})">✏️</button>
             <button class="btn btn-sm btn-gray" onclick="imprimirInvoice(${i.id})">🖨️</button>
             ${i.status!=='Pago'?`<button class="btn btn-sm" style="background:#0ea5e9;color:#fff" onclick="abrirPagamento(${i.id})">💳 Pay Now</button>`:''}
@@ -1162,6 +1196,7 @@ function renderInvoices() {
 }
 
 function abrirModalInvoice(id) {
+  iniciarAnexos();
   const inv=id?db.invoices.find(x=>x.id==id):null;
   const itens=inv?.itens||[{tipo:'gutter',desc:'',qty:1,preco:0}];
   const clientesOpts=db.clientes.map(c=>`<option value="${c.id}" ${inv?.clienteId==c.id?'selected':''}>${c.nome}</option>`).join('');
@@ -1186,8 +1221,9 @@ function abrirModalInvoice(id) {
       <div class="form-group"><label>Payment Terms</label><input id="f-terms" value="${inv?.paymentTerms||'Net 30'}" placeholder="Net 30"></div>
       <div class="form-group"><label>Técnico</label><input id="f-tec" value="${inv?.tecnico||''}" placeholder="Technician name"></div>
       <div class="form-group span2"><label>Notas</label><textarea id="f-notas">${inv?.notas||''}</textarea></div>
-    </div>${itensHtml}`,
+    </div>${itensHtml}${renderAnexoSection('invoice',id||0)}`,
   `<button class="btn btn-gray" onclick="fecharModal()">Cancelar</button><button class="btn btn-primary" onclick="salvarInvoice(${id||0})">${inv?'Salvar':'Criar'}</button>`,'720px');
+  if(id) setTimeout(()=>loadAnexoThumbs('invoice',id),80);
 }
 
 function salvarInvoice(id) {
@@ -1196,8 +1232,10 @@ function salvarInvoice(id) {
   const subtotal=itens.reduce((s,i)=>s+(parseFloat(i.qty)||0)*(parseFloat(i.preco)||0),0);
   const desconto=parseFloat(document.getElementById('f-desconto').value||0);
   const obj={clienteId:parseInt(clienteId),servico:document.getElementById('f-servico').value,dataEmissao:document.getElementById('f-dataEmissao').value,dataVenc:document.getElementById('f-dataVenc').value,status:document.getElementById('f-status').value,paymentTerms:document.getElementById('f-terms').value,tecnico:document.getElementById('f-tec').value,notas:document.getElementById('f-notas').value,itens,subtotal,desconto,total:subtotal-desconto};
-  if(id){const i=db.invoices.findIndex(x=>x.id==id);if(i>=0)db.invoices[i]={...db.invoices[i],...obj};}else{obj.id=nextId('invoices');db.invoices.push(obj);}
+  let invFinalId=id;
+  if(id){const i=db.invoices.findIndex(x=>x.id==id);if(i>=0)db.invoices[i]={...db.invoices[i],...obj};}else{obj.id=nextId('invoices');obj.attachments=[];db.invoices.push(obj);invFinalId=obj.id;}
   salvar();fecharModal();renderInvoices();toast(id?'Invoice atualizada!':'Invoice criada!','success');
+  salvarAnexosPendentes('invoice',invFinalId).then(()=>{if(_pendingAnexos.length===0)renderInvoices();});
 }
 
 function marcarPago(id) {
@@ -1909,6 +1947,119 @@ function pagarConta(id) {
 function deletarCP(id){if(!confirm('Remover conta?'))return;db.contasPagar=db.contasPagar.filter(x=>x.id!=id);salvar();renderFinanceiro();}
 
 // ===== MODAL GENÉRICO =====
+
+// ===== INDEXEDDB FILE STORAGE =====
+const IDB_NAME='alumicraft_files',IDB_VER=1,IDB_STORE='files';
+function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open(IDB_NAME,IDB_VER);req.onupgradeneeded=e=>e.target.result.createObjectStore(IDB_STORE,{keyPath:'id'});req.onsuccess=e=>res(e.target.result);req.onerror=rej;});}
+async function idbSave(id,blob){const db=await idbOpen();return new Promise((res,rej)=>{const tx=db.transaction(IDB_STORE,'readwrite');tx.objectStore(IDB_STORE).put({id,blob});tx.oncomplete=res;tx.onerror=rej;});}
+async function idbGet(id){const db=await idbOpen();return new Promise((res,rej)=>{const req=db.transaction(IDB_STORE).objectStore(IDB_STORE).get(id);req.onsuccess=e=>res(e.target.result?.blob);req.onerror=rej;});}
+async function idbDel(id){const db=await idbOpen();return new Promise((res,rej)=>{const tx=db.transaction(IDB_STORE,'readwrite');tx.objectStore(IDB_STORE).delete(id);tx.oncomplete=res;tx.onerror=rej;});}
+
+// ===== ANEXOS / ATTACHMENTS =====
+let _pendingAnexos=[];
+
+function _anexoEntityKey(type){return type==='orc'?'orcamentos':type==='ordem'?'ordens':'invoices';}
+
+function iniciarAnexos(){_pendingAnexos=[];}
+
+function renderAnexoSection(type,id){
+  const key=_anexoEntityKey(type);
+  const record=id?db[key].find(x=>x.id==id):null;
+  const saved=record?.attachments||[];
+  const savedHtml=saved.map(a=>`
+    <div class="anexo-item" id="anexo-s-${a.id}">
+      ${a.type.startsWith('image/')?
+        `<img class="anexo-thumb" src="" data-idbid="${a.id}" alt="${a.name}" title="${a.name}" onclick="viewAnexo('${a.id}','${a.name}','${a.type}')">`:
+        `<div class="anexo-file" onclick="viewAnexo('${a.id}','${a.name}','${a.type}')"><span class="af-icon">${a.type==='application/pdf'?'📄':'📁'}</span><span class="af-ext">${a.name.split('.').pop().toUpperCase()}</span><span class="af-name">${a.name}</span></div>`
+      }
+      <button class="anexo-del" onclick="removerAnexoSalvo('${type}',${id},'${a.id}')" title="Remover">✕</button>
+    </div>`).join('');
+  return `<div class="anexo-section">
+    <h4>📎 Fotos & Arquivos <span style="font-size:.75rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim)"> – fotos, PDFs, contratos...</span></h4>
+    <div class="anexo-grid" id="anexo-saved-${type}-${id}">${savedHtml}</div>
+    <div class="anexo-grid" id="anexo-pending-grid"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+      <div class="anexo-add-btn" onclick="document.getElementById('_anexo-input').click()" title="Adicionar foto ou arquivo">
+        <span style="font-size:1.5rem">📷</span><span>Adicionar</span>
+      </div>
+      <input type="file" id="_anexo-input" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display:none" onchange="onAnexoSelected(event,'${type}',${id})">
+      ${saved.length?`<span style="font-size:.78rem;color:var(--text-muted)">${saved.length} arquivo${saved.length>1?'s':''} salvo${saved.length>1?'s':''}</span>`:''}
+    </div>
+  </div>`;
+}
+
+async function loadAnexoThumbs(type,id){
+  const key=_anexoEntityKey(type);
+  const record=id?db[key].find(x=>x.id==id):null;
+  if(!record?.attachments)return;
+  for(const a of record.attachments){
+    if(a.type.startsWith('image/')){
+      const blob=await idbGet(a.id);
+      if(blob){const url=URL.createObjectURL(blob);const img=document.querySelector(`img[data-idbid="${a.id}"]`);if(img)img.src=url;}
+    }
+  }
+}
+
+function onAnexoSelected(event,type,id){
+  const files=[...event.target.files];
+  const grid=document.getElementById('anexo-pending-grid');if(!grid)return;
+  files.forEach(file=>{
+    if(file.size>15*1024*1024){toast('Arquivo muito grande (máx 15MB): '+file.name,'error');return;}
+    const idx=_pendingAnexos.length;
+    _pendingAnexos.push({file});
+    const item=document.createElement('div');
+    item.className='anexo-item';item.id='pending-anexo-'+idx;
+    if(file.type.startsWith('image/')){
+      const reader=new FileReader();
+      reader.onload=e=>{item.innerHTML=`<img class="anexo-thumb anexo-pending-border" src="${e.target.result}" alt="${file.name}" title="${file.name}"><button class="anexo-del" onclick="removerAnexoPending(${idx})">✕</button>`;};
+      reader.readAsDataURL(file);
+    }else{
+      item.innerHTML=`<div class="anexo-file anexo-pending-border"><span class="af-icon">${file.type==='application/pdf'?'📄':'📁'}</span><span class="af-ext">${file.name.split('.').pop().toUpperCase()}</span><span class="af-name">${file.name}</span></div><button class="anexo-del" onclick="removerAnexoPending(${idx})">✕</button>`;
+    }
+    grid.appendChild(item);
+  });
+  event.target.value='';
+}
+
+function removerAnexoPending(idx){
+  _pendingAnexos[idx]=null;
+  const el=document.getElementById('pending-anexo-'+idx);if(el)el.remove();
+}
+
+async function removerAnexoSalvo(type,id,anexoId){
+  if(!confirm('Remover este arquivo?'))return;
+  const key=_anexoEntityKey(type);
+  const recIdx=db[key].findIndex(x=>x.id==id);if(recIdx<0)return;
+  await idbDel(anexoId);
+  db[key][recIdx].attachments=(db[key][recIdx].attachments||[]).filter(a=>a.id!==anexoId);
+  salvar();
+  const el=document.getElementById('anexo-s-'+anexoId);if(el)el.remove();
+  toast('Arquivo removido.','success');
+}
+
+async function viewAnexo(idbId,name,type){
+  const blob=await idbGet(idbId);
+  if(!blob){toast('Arquivo não encontrado no dispositivo.','error');return;}
+  const url=URL.createObjectURL(blob);
+  if(type.startsWith('image/')||type==='application/pdf'){window.open(url,'_blank');}
+  else{const a=document.createElement('a');a.href=url;a.download=name;a.click();}
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+
+async function salvarAnexosPendentes(type,recordId){
+  const key=_anexoEntityKey(type);
+  const idx=db[key].findIndex(x=>x.id==recordId);if(idx<0)return;
+  if(!db[key][idx].attachments)db[key][idx].attachments=[];
+  for(const p of _pendingAnexos){
+    if(!p)continue;
+    const attId='att_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
+    await idbSave(attId,p.file);
+    db[key][idx].attachments.push({id:attId,name:p.file.name,type:p.file.type,size:p.file.size,date:today()});
+  }
+  _pendingAnexos=[];
+  salvar();
+}
+
 function abrirModal(titulo, corpo, footer, maxW='620px') {
   const html=`<div class="modal-overlay" onclick="fecharModal(event)" id="modal-overlay">
     <div class="modal" style="max-width:${maxW}">
