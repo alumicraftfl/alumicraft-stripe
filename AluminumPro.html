@@ -178,10 +178,57 @@
   #toast.hidden { opacity: 0; pointer-events: none; }
   #toast.success { background: var(--success); } #toast.error { background: var(--danger); }
 
+
+  /* ===== LOGIN / AUTH ===== */
+  #login-overlay{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#060d1f 0%,#0d1f3c 100%);justify-content:center;align-items:center;flex-direction:column}
+  #login-overlay.show{display:flex}
+  .login-box{background:#fff;border-radius:18px;padding:40px 44px;width:100%;max-width:400px;box-shadow:0 24px 60px rgba(0,0,0,.5);animation:fadeUp .3s ease}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .login-logo{text-align:center;margin-bottom:20px}
+  .login-logo img{height:60px;object-fit:contain}
+  .login-brand{font-size:1.7rem;font-weight:800;color:#1a5fa8;margin-top:6px}
+  .login-box h2{margin:0 0 4px;font-size:1.35rem;color:#1a202c;font-weight:800}
+  .login-sub{margin:0 0 22px;font-size:.84rem;color:#718096}
+  .login-field{margin-bottom:14px}
+  .login-field label{display:block;font-size:.78rem;font-weight:700;color:#4a5568;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+  .login-field input{width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.95rem;outline:none;transition:border .15s;box-sizing:border-box}
+  .login-field input:focus{border-color:#1a5fa8;box-shadow:0 0 0 3px rgba(26,95,168,.12)}
+  .login-btn{width:100%;padding:12px;background:#1a5fa8;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:8px;transition:background .15s}
+  .login-btn:hover{background:#1250a0}
+  .login-error{color:#e53e3e;font-size:.83rem;margin-top:10px;text-align:center;min-height:18px}
+  .user-chip{display:flex;align-items:center;gap:8px;font-size:.84rem;color:#4a5568}
+  .user-avatar{width:30px;height:30px;background:#1a5fa8;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;flex-shrink:0}
+  .logout-btn{background:none;border:1px solid #e2e8f0;border-radius:7px;padding:5px 11px;font-size:.8rem;color:#718096;cursor:pointer;transition:all .15s}
+  .logout-btn:hover{background:#fff0f0;color:#e53e3e;border-color:#feb2b2}
+  .perm-toggle{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border);cursor:pointer}
+  .perm-toggle input[type=checkbox]{width:17px;height:17px;accent-color:#1a5fa8;cursor:pointer;flex-shrink:0}
+  .perm-toggle span{font-size:.88rem;color:var(--text);font-weight:500}
   @media print { #sidebar, #topbar { display: none; } #main { margin-left: 0; } #content { padding: 10px; } .btn, .search-bar { display: none; } }
 </style>
 </head>
 <body>
+
+<!-- ===== LOGIN OVERLAY ===== -->
+<div id="login-overlay" class="show">
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="logo.png" alt="AlumiCraft" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <div class="login-brand" style="display:none">🏗️ AlumiCraft</div>
+    </div>
+    <h2>Bem-vindo de volta!</h2>
+    <p class="login-sub">Digite suas credenciais para acessar o sistema</p>
+    <div class="login-field">
+      <label>Usuário</label>
+      <input type="text" id="login-user" placeholder="Digite seu usuário" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-field">
+      <label>Senha</label>
+      <input type="password" id="login-pass" placeholder="Digite sua senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="login-btn" onclick="doLogin()">🔐 Entrar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
 
 <div id="sidebar">
   <div class="logo">
@@ -198,6 +245,7 @@
     <a onclick="showPage('estoque')" id="nav-estoque"><span class="icon">📦</span> Estoque</a>
     <a onclick="showPage('financeiro')" id="nav-financeiro"><span class="icon">💰</span> Financeiro</a>
     <a onclick="showPage('settings')" id="nav-settings"><span class="icon">⚙️</span> Configurações</a>
+    <a onclick="showPage('usuarios')" id="nav-usuarios" style="display:none"><span class="icon">👤</span> Usuários</a>
   </nav>
   <div class="version">AlumiCraft v3.0</div>
 </div>
@@ -206,6 +254,8 @@
   <div id="topbar">
     <h1 id="page-title">Dashboard</h1>
     <div class="topbar-right">
+      <div class="user-chip" id="user-chip" style="display:none"><div class="user-avatar" id="user-avatar">A</div><span id="user-name">Admin</span></div>
+      <button class="logout-btn" id="logout-btn" style="display:none" onclick="logout()">🚪 Sair</button>
       <img src="logo.png" alt="AlumiCraft" style="height:32px;object-fit:contain" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span style="display:none" class="badge-empresa">🏗️ AlumiCraft</span>
       <button class="btn btn-sm btn-outline" onclick="exportarDados()">⬇️ Exportar</button>
       <button class="btn btn-sm btn-accent" onclick="importarDados()">⬆️ Importar</button>
@@ -223,6 +273,7 @@ let db = {
   clientes: [], orcamentos: [], ordens: [], invoices: [],
   estoque: [], financeiro: [], contasPagar: [],
   leads: [], campanhas: [],
+  users: [],
   settings: {
     gateway: 'stripe_netlify',
     stripeFunction: '',
@@ -233,24 +284,303 @@ let db = {
     companyEmail: '',
     companyAddress: ''
   },
-  _id: { clientes:1, orcamentos:1, ordens:1, invoices:1, estoque:1, financeiro:1, contasPagar:1, leads:1, campanhas:1 }
+  _id: { clientes:1, orcamentos:1, ordens:1, invoices:1, estoque:1, financeiro:1, contasPagar:1, leads:1, campanhas:1, users:1 }
 };
 const STORAGE_KEY = 'aluminumpro_v2';
 function salvar() { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
-function carregar() { const d = localStorage.getItem(STORAGE_KEY); if(d) { try { const p=JSON.parse(d); db={...db,...p}; if(!db.invoices) db.invoices=[]; if(!db.contasPagar) db.contasPagar=[]; if(!db.leads) db.leads=[]; if(!db.campanhas) db.campanhas=[]; if(!db.settings) db.settings={gateway:'stripe_netlify',stripeFunction:'',paymentLink:'',financingLink:'',financingAPR:18,companyPhone:'',companyEmail:'',companyAddress:''}; if(!db.settings.stripeFunction) db.settings.stripeFunction=''; if(!db._id.invoices) db._id.invoices=1; if(!db._id.contasPagar) db._id.contasPagar=1; if(!db._id.leads) db._id.leads=1; if(!db._id.campanhas) db._id.campanhas=1; } catch(e){} } }
+function carregar() { const d = localStorage.getItem(STORAGE_KEY); if(d) { try { const p=JSON.parse(d); db={...db,...p}; if(!db.invoices) db.invoices=[]; if(!db.contasPagar) db.contasPagar=[]; if(!db.leads) db.leads=[]; if(!db.campanhas) db.campanhas=[]; if(!db.settings) db.settings={gateway:'stripe_netlify',stripeFunction:'',paymentLink:'',financingLink:'',financingAPR:18,companyPhone:'',companyEmail:'',companyAddress:''}; if(!db.settings.stripeFunction) db.settings.stripeFunction=''; if(!db._id.invoices) db._id.invoices=1; if(!db._id.contasPagar) db._id.contasPagar=1; if(!db._id.leads) db._id.leads=1; if(!db._id.campanhas) db._id.campanhas=1; if(!db.users) db.users=[]; if(!db._id.users) db._id.users=1; seedAdmin(); } catch(e){ seedAdmin(); } } else { seedAdmin(); } }
 function nextId(col) { const id=db._id[col]++; salvar(); return id; }
 
 // ===== NAVEGAÇÃO =====
 let paginaAtual = 'dashboard';
-const PAGE_TITLES = { dashboard:'Dashboard', clientes:'Clientes', orcamentos:'Orçamentos', ordens:'Ordens de Serviço', invoices:'Invoices', leads:'Leads & Campanhas', estoque:'Estoque de Materiais', financeiro:'Financeiro', settings:'Configurações' };
-const PAGE_RENDERS = { dashboard:renderDashboard, clientes:renderClientes, orcamentos:renderOrcamentos, ordens:renderOrdens, invoices:renderInvoices, leads:renderLeads, estoque:renderEstoque, financeiro:renderFinanceiro, settings:renderSettings };
+const PAGE_TITLES = { dashboard:'Dashboard', clientes:'Clientes', orcamentos:'Orçamentos', ordens:'Ordens de Serviço', invoices:'Invoices', leads:'Leads & Campanhas', estoque:'Estoque de Materiais', financeiro:'Financeiro', settings:'Configurações', usuarios:'Gerenciar Usuários' };
+const PAGE_RENDERS = { dashboard:renderDashboard, clientes:renderClientes, orcamentos:renderOrcamentos, ordens:renderOrdens, invoices:renderInvoices, leads:renderLeads, estoque:renderEstoque, financeiro:renderFinanceiro, settings:renderSettings, usuarios:renderUsuarios };
 
 function showPage(page) {
+  if(!canAccess(page)){ toast('⛔ Acesso não autorizado!','error'); return; }
   paginaAtual = page;
   document.querySelectorAll('#sidebar nav a').forEach(a=>a.classList.remove('active'));
-  document.getElementById('nav-'+page).classList.add('active');
+  const navEl=document.getElementById('nav-'+page);
+  if(navEl) navEl.classList.add('active');
   document.getElementById('page-title').textContent = PAGE_TITLES[page];
   PAGE_RENDERS[page]();
+}
+
+// ===== AUTH =====
+const SESSION_KEY = 'aluminumpro_session';
+
+function hashPass(p) {
+  let h = 2166136261 >>> 0;
+  for(let i=0;i<p.length;i++){ h ^= p.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h.toString(36);
+}
+
+function seedAdmin() {
+  if(!db.users) db.users = [];
+  if(!db._id) db._id = {};
+  if(!db._id.users) db._id.users = 1;
+  if(db.users.length === 0) {
+    db.users.push({
+      id:1, nome:'Administrador', username:'admin',
+      password: hashPass('admin123'), isAdmin:true,
+      perms:{clientes:true,orcamentos:true,financeiro:true,estoque:true,leads:true}
+    });
+    db._id.users = 2;
+    salvar();
+  }
+}
+
+function getSession() {
+  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY)); } catch(e) { return null; }
+}
+
+function checkAuth() {
+  const sess = getSession();
+  if(!sess) { showLoginScreen(); return; }
+  const user = db.users.find(u=>u.id===sess.id && u.username===sess.username);
+  if(!user) { showLoginScreen(); return; }
+  applyPermissions(user);
+  showApp(user);
+  renderDashboard();
+}
+
+function showLoginScreen() {
+  document.getElementById('login-overlay').classList.add('show');
+  document.getElementById('user-chip').style.display='none';
+  document.getElementById('logout-btn').style.display='none';
+  setTimeout(()=>{ const el=document.getElementById('login-user'); if(el) el.focus(); },100);
+}
+
+function showApp(user) {
+  document.getElementById('login-overlay').classList.remove('show');
+  document.getElementById('login-error').textContent='';
+  document.getElementById('login-user').value='';
+  document.getElementById('login-pass').value='';
+  document.getElementById('user-chip').style.display='flex';
+  document.getElementById('logout-btn').style.display='inline-block';
+  const initials = user.nome.trim().split(/\s+/).map(w=>w[0]||'').join('').substring(0,2).toUpperCase();
+  document.getElementById('user-avatar').textContent = initials||'?';
+  document.getElementById('user-name').textContent = user.nome;
+}
+
+function doLogin() {
+  const username = (document.getElementById('login-user').value||'').trim();
+  const password = document.getElementById('login-pass').value||'';
+  const errEl = document.getElementById('login-error');
+  if(!username||!password){ errEl.textContent='Preencha usuário e senha.'; return; }
+  const user = db.users.find(u=>u.username===username && u.password===hashPass(password));
+  if(!user){ errEl.textContent='Usuário ou senha incorretos.'; document.getElementById('login-pass').value=''; return; }
+  errEl.textContent='';
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({id:user.id,username:user.username}));
+  applyPermissions(user);
+  showApp(user);
+  // Navigate to first allowed page
+  renderDashboard();
+  paginaAtual='dashboard';
+  document.querySelectorAll('#sidebar nav a').forEach(a=>a.classList.remove('active'));
+  const nd=document.getElementById('nav-dashboard');
+  if(nd) nd.classList.add('active');
+  document.getElementById('page-title').textContent='Dashboard';
+}
+
+function logout() {
+  sessionStorage.removeItem(SESSION_KEY);
+  showLoginScreen();
+  document.querySelectorAll('#sidebar nav a').forEach(a=>a.classList.remove('active'));
+  const nd=document.getElementById('nav-dashboard');
+  if(nd) nd.classList.add('active');
+}
+
+function currentUser() {
+  const sess = getSession();
+  if(!sess) return null;
+  return db.users.find(u=>u.id===sess.id) || null;
+}
+
+function canAccess(page) {
+  const user = currentUser();
+  if(!user) return false;
+  if(user.isAdmin) return true;
+  const p = user.perms || {};
+  const map = {
+    dashboard:true, clientes:p.clientes, orcamentos:p.orcamentos,
+    ordens:p.orcamentos, invoices:p.orcamentos,
+    financeiro:p.financeiro, estoque:p.estoque, leads:p.leads,
+    settings:false, usuarios:false
+  };
+  return !!map[page];
+}
+
+function applyPermissions(user) {
+  const A = !!user.isAdmin;
+  const p = user.perms || {};
+  const vis = (id,v)=>{ const el=document.getElementById(id); if(el) el.style.display=v?'':'none'; };
+  vis('nav-dashboard', true);
+  vis('nav-clientes',   A||p.clientes);
+  vis('nav-orcamentos', A||p.orcamentos);
+  vis('nav-ordens',     A||p.orcamentos);
+  vis('nav-invoices',   A||p.orcamentos);
+  vis('nav-leads',      A||p.leads);
+  vis('nav-estoque',    A||p.estoque);
+  vis('nav-financeiro', A||p.financeiro);
+  vis('nav-settings',   A);
+  vis('nav-usuarios',   A);
+}
+
+// ===== USUÁRIOS (admin) =====
+function renderUsuarios() {
+  const me = currentUser();
+  if(!me?.isAdmin){ toast('⛔ Acesso restrito ao administrador!','error'); return; }
+  const lista = db.users;
+  document.getElementById('content').innerHTML = `
+    <div class="panel" style="max-width:860px">
+      <div class="panel-header">
+        <h2>👤 Gerenciar Usuários</h2>
+        <button class="btn btn-primary" onclick="abrirModalUsuario(0)">+ Novo Usuário</button>
+      </div>
+      <table class="table">
+        <thead><tr>
+          <th>Nome</th><th>Usuário</th><th>Perfil</th>
+          <th style="text-align:center">Clientes</th>
+          <th style="text-align:center">Orç/OS/Inv</th>
+          <th style="text-align:center">Financeiro</th>
+          <th style="text-align:center">Estoque</th>
+          <th style="text-align:center">Leads</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${lista.map(u=>{
+            const chk = (k)=>u.isAdmin?'<span style="color:#48bb78;font-size:1.1rem">✓</span>':(u.perms?.[k]?'<span style="color:#48bb78;font-size:1.1rem">✓</span>':'<span style="color:#cbd5e0">—</span>');
+            return `<tr>
+              <td><strong>${u.nome}</strong></td>
+              <td><code style="background:var(--bg);padding:2px 7px;border-radius:4px;font-size:.82rem">${u.username}</code></td>
+              <td>${u.isAdmin?'<span class="badge" style="background:#1a5fa8;color:#fff;padding:3px 9px;border-radius:20px;font-size:.78rem">👑 Admin</span>':'<span class="badge" style="background:#e2e8f0;color:#4a5568;padding:3px 9px;border-radius:20px;font-size:.78rem">👤 Funcionário</span>'}</td>
+              <td style="text-align:center">${chk('clientes')}</td>
+              <td style="text-align:center">${chk('orcamentos')}</td>
+              <td style="text-align:center">${chk('financeiro')}</td>
+              <td style="text-align:center">${chk('estoque')}</td>
+              <td style="text-align:center">${chk('leads')}</td>
+              <td><div style="display:flex;gap:6px;justify-content:flex-end">
+                <button class="btn btn-sm btn-outline" onclick="abrirModalUsuario(${u.id})">✏️ Editar</button>
+                ${u.isAdmin?'':'<button class="btn btn-sm" style="background:#fff0f0;color:#e53e3e;border:1px solid #feb2b2" onclick="excluirUsuario('+u.id+')">🗑️</button>'}
+              </div></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <div style="margin-top:16px;padding:14px;background:#fffbeb;border-radius:8px;border:1px solid #fcd34d;font-size:.82rem;color:#92400e">
+        💡 <strong>Login padrão inicial:</strong> usuário <code>admin</code> / senha <code>admin123</code> — troque a senha clicando em ✏️ Editar.
+      </div>
+    </div>
+
+    <div id="modal-usuario" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;justify-content:center;align-items:flex-start;padding-top:60px">
+      <div style="background:#fff;border-radius:14px;padding:32px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto">
+        <h3 id="modal-user-title" style="margin:0 0 20px;font-size:1.1rem;color:var(--text)">Novo Usuário</h3>
+        <input type="hidden" id="modal-uid">
+        <div class="form-grid">
+          <div class="form-group span2"><label>Nome completo</label><input id="u-nome" placeholder="Ex: João Silva"></div>
+          <div class="form-group"><label>Usuário (login)</label><input id="u-username" placeholder="joao.silva"></div>
+          <div class="form-group"><label>Senha <span id="u-pass-hint" style="font-size:.75rem;color:var(--text-muted);font-weight:400">(obrigatória)</span></label><input type="password" id="u-senha" placeholder="Nova senha..."></div>
+        </div>
+        <div id="u-perms-area" style="margin:16px 0">
+          <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🔑 Acesso por Módulo</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label class="perm-toggle"><input type="checkbox" id="p-clientes"><span>👥 Clientes — cadastro e histórico</span></label>
+            <label class="perm-toggle"><input type="checkbox" id="p-orcamentos"><span>📋 Orçamentos, OS e Invoices</span></label>
+            <label class="perm-toggle"><input type="checkbox" id="p-financeiro"><span>💰 Financeiro — lançamentos e contas</span></label>
+            <label class="perm-toggle"><input type="checkbox" id="p-estoque"><span>📦 Estoque de Materiais</span></label>
+            <label class="perm-toggle"><input type="checkbox" id="p-leads"><span>🎯 Leads & Campanhas</span></label>
+          </div>
+        </div>
+        <div id="u-admin-area" style="display:none;margin-bottom:16px;padding:12px 14px;background:#eff6ff;border-radius:8px;font-size:.83rem;color:#1a5fa8;border:1px solid #bfdbfe">
+          👑 <strong>Administrador</strong> — Tem acesso completo ao sistema, incluindo Configurações e Gerenciamento de Usuários.
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+          <button class="btn btn-outline" onclick="fecharModalUsuario()">Cancelar</button>
+          <button class="btn btn-primary" onclick="salvarUsuario()">💾 Salvar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function abrirModalUsuario(uid) {
+  const modal = document.getElementById('modal-usuario');
+  modal.style.display = 'flex';
+  const u = uid ? db.users.find(x=>x.id===uid) : null;
+  document.getElementById('modal-user-title').textContent = u ? '✏️ Editar Usuário' : '👤 Novo Usuário';
+  document.getElementById('modal-uid').value = uid||'';
+  document.getElementById('u-nome').value = u?.nome||'';
+  document.getElementById('u-username').value = u?.username||'';
+  document.getElementById('u-senha').value = '';
+  document.getElementById('u-pass-hint').textContent = u ? '(deixe em branco para não alterar)' : '(obrigatória)';
+  const p = u?.perms||{};
+  ['clientes','orcamentos','financeiro','estoque','leads'].forEach(k=>{
+    const el=document.getElementById('p-'+k);
+    if(el) el.checked = u?.isAdmin ? true : (!!p[k]);
+  });
+  document.getElementById('u-perms-area').style.display = u?.isAdmin ? 'none' : 'block';
+  document.getElementById('u-admin-area').style.display = u?.isAdmin ? 'block' : 'none';
+}
+
+function fecharModalUsuario() {
+  const m=document.getElementById('modal-usuario');
+  if(m) m.style.display='none';
+}
+
+function salvarUsuario() {
+  const uid = parseInt(document.getElementById('modal-uid').value)||0;
+  const nome = (document.getElementById('u-nome').value||'').trim();
+  const username = (document.getElementById('u-username').value||'').trim().toLowerCase().replace(/\s+/g,'.');
+  const senha = document.getElementById('u-senha').value||'';
+  if(!nome||!username){ toast('Preencha nome e usuário.','error'); return; }
+  if(!/^[a-z0-9._]+$/.test(username)){ toast('Usuário: use apenas letras, números, ponto ou underscore.','error'); return; }
+  const dup = db.users.find(u=>u.username===username && u.id!==uid);
+  if(dup){ toast('Este nome de usuário já existe.','error'); return; }
+  if(uid){
+    const idx=db.users.findIndex(u=>u.id===uid);
+    if(idx<0) return;
+    db.users[idx].nome=nome;
+    db.users[idx].username=username;
+    if(senha) db.users[idx].password=hashPass(senha);
+    if(!db.users[idx].isAdmin){
+      db.users[idx].perms={
+        clientes:document.getElementById('p-clientes').checked,
+        orcamentos:document.getElementById('p-orcamentos').checked,
+        financeiro:document.getElementById('p-financeiro').checked,
+        estoque:document.getElementById('p-estoque').checked,
+        leads:document.getElementById('p-leads').checked
+      };
+    }
+    toast('Usuário atualizado!','success');
+  } else {
+    if(!senha){ toast('Informe uma senha.','error'); return; }
+    if(senha.length<4){ toast('Senha deve ter ao menos 4 caracteres.','error'); return; }
+    db.users.push({
+      id:db._id.users++, nome, username,
+      password:hashPass(senha), isAdmin:false,
+      perms:{
+        clientes:document.getElementById('p-clientes').checked,
+        orcamentos:document.getElementById('p-orcamentos').checked,
+        financeiro:document.getElementById('p-financeiro').checked,
+        estoque:document.getElementById('p-estoque').checked,
+        leads:document.getElementById('p-leads').checked
+      }
+    });
+    toast('Usuário criado com sucesso!','success');
+  }
+  salvar();
+  fecharModalUsuario();
+  renderUsuarios();
+}
+
+function excluirUsuario(uid) {
+  const u=db.users.find(x=>x.id===uid);
+  if(!u||u.isAdmin) return;
+  if(!confirm('Excluir o usuário "'+u.nome+'"?')) return;
+  db.users=db.users.filter(x=>x.id!==uid);
+  salvar();
+  renderUsuarios();
+  toast('Usuário removido.','success');
 }
 
 // ===== TOAST =====
@@ -1747,7 +2077,7 @@ function carregarArquivo(event){const f=event.target.files[0];if(!f)return;const
 
 // ===== INIT =====
 carregar();
-renderDashboard();
+checkAuth();
 </script>
 </body>
 </html>
