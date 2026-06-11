@@ -464,6 +464,14 @@
     </div>
     <button class="login-btn" onclick="doLogin()">🔐 Sign In</button>
     <div class="login-error" id="login-error"></div>
+    <div style="margin-top:16px;border-top:1px solid #1a2d4a;padding-top:14px">
+      <button onclick="toggleJoinBox()" style="background:none;border:1px solid #1d3050;color:#4d6a87;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:.8rem;width:100%;transition:all .15s" onmouseover="this.style.borderColor='#0066ff';this.style.color='#00b4ff'" onmouseout="this.style.borderColor='#1d3050';this.style.color='#4d6a87'">🌐 Connect to Company Network</button>
+      <div id="join-code-box" style="display:none;margin-top:10px">
+        <input id="join-code-input" placeholder="Paste company code here..." style="width:100%;padding:9px 12px;border:1.5px solid #1a2d4a;border-radius:7px;background:#081220;color:#c8d8ee;font-size:.82rem;box-sizing:border-box;margin-bottom:8px;outline:none" onfocus="this.style.borderColor='#0066ff'" onblur="this.style.borderColor='#1a2d4a'">
+        <button onclick="applyJoinCode()" style="width:100%;padding:9px;background:#0066ff22;color:#00b4ff;border:1px solid #0066ff44;border-radius:7px;cursor:pointer;font-size:.85rem;font-weight:700;letter-spacing:.3px">🔗 Connect &amp; Sync</button>
+        <div id="join-status" style="font-size:.78rem;color:#4d6a87;margin-top:8px;text-align:center;min-height:16px"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -497,6 +505,7 @@
       <h1 id="page-title">Dashboard</h1>
     </div>
     <div class="topbar-right">
+      <span id="cloud-badge" style="line-height:1"></span>
       <div class="user-chip" id="user-chip" style="display:none"><div class="user-avatar" id="user-avatar">A</div><span id="user-name">Admin</span></div>
       <button class="logout-btn" id="logout-btn" style="display:none" onclick="logout()">🚪 Logout</button>
       <span id="topbar-logo-wrap"><span class="badge-empresa" id="topbar-logo-fallback" style="font-size:1.1rem;font-weight:800;letter-spacing:-0.3px">🏗️ AlumiCraft</span></span>
@@ -531,7 +540,8 @@ let db = {
   _id: { clientes:1, orcamentos:1, ordens:1, invoices:1, estoque:1, financeiro:1, contasPagar:1, leads:1, campaigns:1, users:1 }
 };
 const STORAGE_KEY = 'aluminumpro_v2';
-function salvar() { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
+function salvarLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
+function salvar() { salvarLocal(); if(window._syncEnabled) syncToCloud(); }
 function carregar() { const d = localStorage.getItem(STORAGE_KEY); if(d) { try { const p=JSON.parse(d); db={...db,...p}; if(!db.invoices) db.invoices=[]; if(!db.contasPagar) db.contasPagar=[]; if(!db.leads) db.leads=[]; if(!db.campaigns) db.campaigns=[]; if(!db.settings) db.settings={gateway:'stripe_netlify',stripeFunction:'',paymentLink:'',financingLink:'',financingAPR:18,companyPhone:'',companyEmail:'',companyAddress:''}; if(!db.settings.stripeFunction) db.settings.stripeFunction=''; if(!db.settings.logoBase64 && db.settings.logoBase64 !== '') db.settings.logoBase64=''; if(!db._id.invoices) db._id.invoices=1; if(!db._id.contasPagar) db._id.contasPagar=1; if(!db._id.leads) db._id.leads=1; if(!db._id.campaigns) db._id.campaigns=1; if(!db.users) db.users=[]; if(!db._id.users) db._id.users=1; seedAdmin(); } catch(e){ seedAdmin(); } } else { seedAdmin(); } }
 function nextId(col) { const id=db._id[col]++; salvar(); return id; }
 
@@ -557,6 +567,140 @@ function goToInvoice(id) { showPage('invoices');  if(id) setTimeout(()=>abrirMod
 function goToLead(id)    { showPage('leads');     if(id) setTimeout(()=>abrirModalLead(id),    150); }
 function goToCliente(id) { showPage('clientes');  if(id) setTimeout(()=>abrirModalCliente(id), 150); }
 function goToAgenda()    { showPage('agenda'); }
+
+
+// ===== CLOUD SYNC (Firebase Firestore) =====
+window._syncEnabled = false;
+window._syncBusy    = false;
+window._fbApp = null;
+window._fbDb  = null;
+
+function cloudConfigured() {
+  const s = db.settings || {};
+  return !!(s.cloudEnabled && s.cloudProjectId && s.cloudApiKey && s.cloudCompanyId);
+}
+
+async function fbMods() {
+  const base = 'https://www.gstatic.com/firebasejs/10.12.0';
+  const [a,f,au] = await Promise.all([
+    import(base+'/firebase-app.js'),
+    import(base+'/firebase-firestore.js'),
+    import(base+'/firebase-auth.js')
+  ]);
+  return {...a,...f,...au};
+}
+
+async function initFirebase(cfg) {
+  try {
+    const s = cfg || db.settings || {};
+    if(!s.cloudProjectId || !s.cloudApiKey) return false;
+    const fb = await fbMods();
+    const fcfg = { apiKey:s.cloudApiKey, authDomain:`${s.cloudProjectId}.firebaseapp.com`, projectId:s.cloudProjectId };
+    try { window._fbApp = fb.initializeApp(fcfg,'alumicraft'); }
+    catch(e){ if(e.code==='app/duplicate-app') window._fbApp=fb.getApp('alumicraft'); else throw e; }
+    window._fbDb = fb.getFirestore(window._fbApp);
+    const auth = fb.getAuth(window._fbApp);
+    await fb.signInAnonymously(auth);
+    window._syncEnabled = true;
+    return true;
+  } catch(e) { console.error('[Cloud] init:',e); window._syncEnabled=false; return false; }
+}
+
+async function syncToCloud() {
+  if(!window._syncEnabled || !window._fbDb) return;
+  if(window._syncBusy) return;
+  window._syncBusy = true;
+  setSyncBadge('syncing');
+  try {
+    const fb = await fbMods();
+    const cid = (db.settings||{}).cloudCompanyId;
+    const ref = fb.doc(window._fbDb,'alumicraft',cid);
+    const copy = JSON.parse(JSON.stringify(db));
+    const logo = copy.settings?.logoBase64||'';
+    if(copy.settings) copy.settings.logoBase64=''; // sync logo separately
+    const payload = JSON.stringify(copy);
+    if(payload.length > 950000){ toast('DB too large to sync','error'); setSyncBadge('error'); return; }
+    await fb.setDoc(ref,{ data:payload, updatedAt:Date.now() });
+    if(logo){
+      const lr = fb.doc(window._fbDb,'alumicraft',cid+'_logo');
+      await fb.setDoc(lr,{ logo, updatedAt:Date.now() });
+    }
+    setSyncBadge('ok');
+  } catch(e){ console.error('[Cloud] syncToCloud:',e); setSyncBadge('error'); }
+  finally { window._syncBusy=false; }
+}
+
+async function syncFromCloud(companyId, fbDb) {
+  const fdb = fbDb||window._fbDb;
+  const cid = companyId||(db.settings||{}).cloudCompanyId;
+  if(!fdb||!cid) return false;
+  try {
+    const fb = await fbMods();
+    const ref = fb.doc(fdb,'alumicraft',cid);
+    const snap = await fb.getDoc(ref);
+    if(!snap.exists()){ await syncToCloud(); return true; }
+    const cloudData = JSON.parse(snap.data().data);
+    const lr = fb.doc(fdb,'alumicraft',cid+'_logo');
+    const ls = await fb.getDoc(lr);
+    if(ls.exists()){ cloudData.settings=cloudData.settings||{}; cloudData.settings.logoBase64=ls.data().logo||''; }
+    db = cloudData;
+    salvarLocal();
+    return true;
+  } catch(e){ console.error('[Cloud] syncFromCloud:',e); return false; }
+}
+
+function setSyncBadge(state){
+  const el=document.getElementById('cloud-badge');
+  if(!el) return;
+  if(state==='syncing') el.innerHTML='<span title="Syncing..." style="color:#f59e0b;font-size:.7rem">⏳</span>';
+  else if(state==='ok')  el.innerHTML='<span title="Synced to cloud" style="color:#10b981;font-size:.7rem">☁️</span>';
+  else if(state==='error') el.innerHTML='<span title="Sync error" style="color:#ef4444;font-size:.7rem">⚠️</span>';
+  else el.innerHTML='';
+}
+
+// Join code = base64("projectId|apiKey|companyId")
+function generateJoinCode(){
+  const s=db.settings||{};
+  if(!s.cloudProjectId||!s.cloudApiKey||!s.cloudCompanyId) return null;
+  return btoa(s.cloudProjectId+'|'+s.cloudApiKey+'|'+s.cloudCompanyId);
+}
+function decodeJoinCode(code){
+  try{
+    const parts=atob(code.trim()).split('|');
+    if(parts.length!==3) return null;
+    return { cloudProjectId:parts[0], cloudApiKey:parts[1], cloudCompanyId:parts[2] };
+  }catch(e){ return null; }
+}
+
+function toggleJoinBox(){
+  const b=document.getElementById('join-code-box');
+  if(b) b.style.display=b.style.display==='none'?'block':'none';
+}
+
+async function applyJoinCode(){
+  const el=document.getElementById('join-code-input');
+  const st=document.getElementById('join-status');
+  const code=(el?.value||'').trim();
+  if(!code){ if(st) st.textContent='⚠️ Paste the company code first.'; return; }
+  const cfg=decodeJoinCode(code);
+  if(!cfg){ if(st) st.textContent='❌ Invalid code. Ask your admin for a new one.'; return; }
+  if(st) st.textContent='⏳ Connecting to company network...';
+  db.settings=db.settings||{};
+  Object.assign(db.settings,cfg,{cloudEnabled:true});
+  salvarLocal();
+  const ok=await initFirebase(db.settings);
+  if(!ok){ if(st) st.textContent='❌ Connection failed. Check code and try again.'; return; }
+  if(st) st.textContent='⏳ Downloading company data...';
+  const synced=await syncFromCloud();
+  if(!synced){ if(st) st.textContent='❌ Could not download data. Try again.'; return; }
+  seedAdmin();
+  if(st) st.textContent='✅ Connected! Loading...';
+  setTimeout(()=>location.reload(),1200);
+}
+
+function genCompanyId(){
+  return 'co-'+Math.random().toString(36).substring(2,8)+Math.random().toString(36).substring(2,6);
+}
 
 // ===== AUTH =====
 const SESSION_KEY = 'aluminumpro_session';
@@ -2075,10 +2219,111 @@ function renderSettings() {
         </div>
       </div>
 
+      <div style="margin-bottom:28px">
+        <h3 style="font-size:.85rem;text-transform:uppercase;color:var(--text-muted);letter-spacing:.5px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">☁️ Cloud Sync (Multi-Device)</h3>
+        <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:16px;border:1px solid var(--border)">
+          <p style="font-size:.82rem;color:var(--text-muted);margin:0 0 10px">Sync your data to the cloud so you and your team can access it from any phone or computer. Uses <strong>Google Firebase</strong> (free).</p>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.88rem;color:var(--text)">
+              <input type="checkbox" id="cfg-cloudEnabled" ${s.cloudEnabled?'checked':''} onchange="toggleCloudFields()" style="width:16px;height:16px;accent-color:var(--accent)">
+              Enable Cloud Sync
+            </label>
+          </div>
+          <div id="cloud-fields" style="display:${s.cloudEnabled?'block':'none'}">
+            <div class="form-grid">
+              <div class="form-group span2">
+                <label>Firebase API Key <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent);font-size:.75rem;margin-left:6px">Get from Firebase Console →</a></label>
+                <input id="cfg-cloudApiKey" value="${s.cloudApiKey||''}" placeholder="AIzaSy..." style="font-family:monospace;font-size:.82rem">
+              </div>
+              <div class="form-group span2">
+                <label>Firebase Project ID</label>
+                <input id="cfg-cloudProjectId" value="${s.cloudProjectId||''}" placeholder="my-project-id" style="font-family:monospace;font-size:.82rem">
+              </div>
+            </div>
+            <div style="margin-bottom:14px">
+              <button class="btn btn-primary" onclick="setupCloud()" style="margin-right:8px">🔗 Connect to Firebase</button>
+              <button class="btn" onclick="syncNow()" style="background:var(--bg)">🔄 Sync Now</button>
+              <span id="cloud-sync-status" style="margin-left:10px;font-size:.8rem"></span>
+            </div>
+            ${s.cloudCompanyId?`
+            <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
+              <p style="font-size:.8rem;font-weight:700;color:var(--text);margin:0 0 8px">📱 Share with employees:</p>
+              <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 10px">Give your employees this Company Code so they can connect from their devices:</p>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <input id="join-code-display" value="${generateJoinCode()||''}" readonly style="flex:1;font-family:monospace;font-size:.72rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);min-width:0">
+                <button class="btn" onclick="copyJoinCode()" style="white-space:nowrap;background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:700">📋 Copy</button>
+              </div>
+              <p style="font-size:.75rem;color:var(--text-muted);margin:8px 0 0">Employee opens the app → "Connect to Company Network" → pastes this code → done.</p>
+            </div>`:
+            `<div style="background:var(--bg);border-radius:8px;padding:12px;border:1px dashed var(--border)"><p style="font-size:.8rem;color:var(--text-muted);margin:0">Enter your Firebase credentials above and click <strong>Connect to Firebase</strong> to generate your company code.</p></div>`
+            }
+            <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border)">
+              <p style="font-size:.82rem;font-weight:700;color:var(--text);margin:0 0 10px">📋 Firebase Setup (one time, 5 min):</p>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                ${[
+                  ['1','Go to <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent)">console.firebase.google.com</a> → click <strong>Create a project</strong> → enter any name → Continue → Disable Google Analytics → <strong>Create project</strong>'],
+                  ['2','Inside the project → click <strong>Firestore Database</strong> (left menu) → <strong>Create database</strong> → choose <strong>Start in test mode</strong> → pick any location → <strong>Done</strong>'],
+                  ['3','Back to project home → click the <strong>&lt;/&gt; Web</strong> icon → register app with any name → copy the <strong>apiKey</strong> and <strong>projectId</strong> values → paste them above'],
+                  ['4','In Firestore → <strong>Rules</strong> tab → replace the rules with: <code style="background:#0d1b2e;padding:2px 6px;border-radius:4px;font-size:.75rem">allow read, write: if true;</code> → <strong>Publish</strong>'],
+                  ['5','Back here → enter apiKey and projectId → click <strong>Connect to Firebase</strong> → copy the Company Code → share with your team']
+                ].map(([n,t])=>`<div style="display:flex;gap:10px;align-items:flex-start">
+                  <span style="min-width:22px;height:22px;background:var(--accent);color:#fff;border-radius:50%;font-size:.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${n}</span>
+                  <span style="font-size:.79rem;color:var(--text-muted);line-height:1.6">${t}</span>
+                </div>`).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style="display:flex;gap:10px;justify-content:flex-end">
-        <button class="btn btn-primary" onclick="salvarSettings()">💾 Save Configurações</button>
+        <button class="btn btn-primary" onclick="salvarSettings()">💾 Save Settings</button>
       </div>
     </div>`;
+}
+
+function toggleCloudFields(){
+  const el=document.getElementById('cloud-fields');
+  if(el) el.style.display=document.getElementById('cfg-cloudEnabled').checked?'block':'none';
+}
+
+async function setupCloud(){
+  const apiKey=(document.getElementById('cfg-cloudApiKey')?.value||'').trim();
+  const projectId=(document.getElementById('cfg-cloudProjectId')?.value||'').trim();
+  const statusEl=document.getElementById('cloud-sync-status');
+  if(!apiKey||!projectId){ toast('Enter Firebase API Key and Project ID first','error'); return; }
+  if(statusEl) statusEl.innerHTML='<span style="color:#f59e0b">⏳ Connecting...</span>';
+  db.settings.cloudApiKey=apiKey;
+  db.settings.cloudProjectId=projectId;
+  db.settings.cloudEnabled=true;
+  if(!db.settings.cloudCompanyId) db.settings.cloudCompanyId=genCompanyId();
+  salvarLocal();
+  const ok=await initFirebase(db.settings);
+  if(!ok){ if(statusEl) statusEl.innerHTML='<span style="color:#ef4444">❌ Connection failed. Check credentials.</span>'; return; }
+  await syncToCloud();
+  if(statusEl) statusEl.innerHTML='<span style="color:#10b981">✅ Connected & synced!</span>';
+  salvar();
+  toast('Cloud sync connected!','success');
+  setTimeout(()=>renderSettings(),1000);
+}
+
+async function syncNow(){
+  const statusEl=document.getElementById('cloud-sync-status');
+  if(!window._syncEnabled){
+    if(statusEl) statusEl.innerHTML='<span style="color:#ef4444">Not connected. Click Connect first.</span>';
+    return;
+  }
+  if(statusEl) statusEl.innerHTML='<span style="color:#f59e0b">⏳ Syncing...</span>';
+  await syncToCloud();
+  if(statusEl) statusEl.innerHTML='<span style="color:#10b981">✅ Synced at '+new Date().toLocaleTimeString()+'</span>';
+}
+
+function copyJoinCode(){
+  const el=document.getElementById('join-code-display');
+  if(!el) return;
+  navigator.clipboard.writeText(el.value).then(()=>toast('Company code copied!','success')).catch(()=>{
+    el.select(); document.execCommand('copy'); toast('Copied!','success');
+  });
 }
 
 function logoFileChanged(event) {
@@ -2161,7 +2406,11 @@ function salvarSettings() {
     companyPhone: document.getElementById('cfg-phone').value.trim(),
     companyEmail: document.getElementById('cfg-email').value.trim(),
     companyAddress: document.getElementById('cfg-address').value.trim(),
-    logoBase64: db.settings.logoBase64 || ''
+    logoBase64: db.settings.logoBase64 || '',
+    cloudEnabled: document.getElementById('cfg-cloudEnabled')?.checked || false,
+    cloudApiKey: (document.getElementById('cfg-cloudApiKey')?.value||'').trim(),
+    cloudProjectId: (document.getElementById('cfg-cloudProjectId')?.value||'').trim(),
+    cloudCompanyId: db.settings.cloudCompanyId || ''
   };
   salvar();
   updateTopbarLogo();
@@ -3095,8 +3344,19 @@ window.addEventListener('beforeinstallprompt', e => {
 
 // ===== INIT =====
 carregar();
-checkAuth();
-updateTopbarLogo();
+(async function startApp(){
+  if(cloudConfigured()){
+    try {
+      const ok = await initFirebase();
+      if(ok){
+        const synced = await syncFromCloud();
+        if(synced) seedAdmin();
+      }
+    } catch(e){ console.error('[Cloud] startup error:',e); }
+  }
+  checkAuth();
+  updateTopbarLogo();
+})();
 </script>
 </body>
 </html>
