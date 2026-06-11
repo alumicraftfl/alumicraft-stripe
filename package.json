@@ -1,4 +1,7 @@
-[build]
-  functions = "netlify/functions"
-  command = "npm install"
-  publish = "."
+{
+  "name": "alumicraft-stripe",
+  "version": "1.0.0",
+  "dependencies": {
+    "stripe": "^16.0.0"
+  }
+}
