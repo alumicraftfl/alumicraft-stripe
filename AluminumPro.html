@@ -346,6 +346,17 @@
   }
 
 
+.link-ref {
+  color: var(--accent); cursor: pointer; font-size: 0.82rem;
+  font-weight: 600; text-decoration: underline; text-underline-offset: 2px;
+  white-space: nowrap;
+}
+.link-ref:hover { opacity: 0.75; }
+.card-clickable { cursor: pointer; transition: transform .15s, box-shadow .15s; }
+.card-clickable:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.recent-list li { cursor: pointer; transition: background .15s; border-radius: 8px; }
+.recent-list li:hover { background: rgba(255,255,255,.05); }
+
 /* ─── AGENDA / CALENDÁRIO ─────────────────────────── */
 .agenda-nav {
   display: flex; align-items: center; gap: 12px;
@@ -538,6 +549,14 @@ function showPage(page) {
   document.getElementById('page-title').textContent = PAGE_TITLES[page];
   PAGE_RENDERS[page]();
 }
+
+// ===== NAVIGATION HELPERS =====
+function goToOrdem(id)   { showPage('ordens');    if(id) setTimeout(()=>abrirModalOrdem(id),   150); }
+function goToOrc(id)     { showPage('orcamentos');if(id) setTimeout(()=>abrirModalOrc(id),     150); }
+function goToInvoice(id) { showPage('invoices');  if(id) setTimeout(()=>abrirModalInvoice(id), 150); }
+function goToLead(id)    { showPage('leads');     if(id) setTimeout(()=>abrirModalLead(id),    150); }
+function goToCliente(id) { showPage('clientes');  if(id) setTimeout(()=>abrirModalCliente(id), 150); }
+function goToAgenda()    { showPage('agenda'); }
 
 // ===== AUTH =====
 const SESSION_KEY = 'aluminumpro_session';
@@ -861,23 +880,23 @@ function renderDashboard() {
 
   document.getElementById('content').innerHTML = `
     <div class="cards-grid">
-      <div class="card"><div class="card-label">Clientes</div><div class="card-value">${db.clientes.length}</div></div>
-      <div class="card yellow"><div class="card-label">Leads Ativos</div><div class="card-value">${db.leads.length-leadsConv}</div><div class="card-sub">${leadsNovos} novos · ${taxaConv}% conv.</div></div>
-      <div class="card green"><div class="card-label">A Receber</div><div class="card-value" style="font-size:1.1rem">${fmt(totalReceber)}</div><div class="card-sub">${invVencidas} vencidas</div></div>
-      <div class="card red"><div class="card-label">A Pagar</div><div class="card-value" style="font-size:1.1rem">${fmt(totalPagar)}</div></div>
-      <div class="card green"><div class="card-label">Receitas (Mês)</div><div class="card-value" style="font-size:1.1rem">${fmt(recMes)}</div></div>
-      <div class="card orange"><div class="card-label">Ads Investido</div><div class="card-value" style="font-size:1.1rem">${fmt(totalInvestido)}</div><div class="card-sub">${db.campanhas.length} campanhas</div></div>
+      <div class="card card-clickable" onclick="showPage('clientes')"><div class="card-label">👥 Clientes</div><div class="card-value">${db.clientes.length}</div></div>
+      <div class="card yellow card-clickable" onclick="showPage('leads')"><div class="card-label">🎯 Leads Ativos</div><div class="card-value">${db.leads.length-leadsConv}</div><div class="card-sub">${leadsNovos} novos · ${taxaConv}% conv.</div></div>
+      <div class="card green card-clickable" onclick="finTab='receber';showPage('financeiro')"><div class="card-label">📥 A Receber</div><div class="card-value" style="font-size:1.1rem">${fmt(totalReceber)}</div><div class="card-sub">${invVencidas} vencidas</div></div>
+      <div class="card red card-clickable" onclick="finTab='pagar';showPage('financeiro')"><div class="card-label">📤 A Pagar</div><div class="card-value" style="font-size:1.1rem">${fmt(totalPagar)}</div></div>
+      <div class="card green card-clickable" onclick="showPage('financeiro')"><div class="card-label">💰 Receitas (Mês)</div><div class="card-value" style="font-size:1.1rem">${fmt(recMes)}</div></div>
+      <div class="card orange card-clickable" onclick="showPage('leads')"><div class="card-label">📢 Ads Investido</div><div class="card-value" style="font-size:1.1rem">${fmt(totalInvestido)}</div><div class="card-sub">${db.campanhas.length} campanhas</div></div>
     </div>
     <div class="dash-row">
       <div class="panel">
-        <div class="panel-header"><h2>🎯 Últimos Leads</h2><button class="btn btn-sm btn-outline" onclick="showPage('leads')">Ver todos</button></div>
+        <div class="panel-header"><h2 class="link-ref" style="font-size:1.1rem" onclick="showPage('leads')">🎯 Últimos Leads</h2><button class="btn btn-sm btn-outline" onclick="showPage('leads')">Ver todos</button></div>
         ${recentes_leads.length===0?'<p class="text-muted" style="text-align:center;padding:20px">Nenhum lead ainda</p>':`
-        <ul class="recent-list">${recentes_leads.map(l=>`<li><span><strong>${l.nome}</strong><br><span class="text-muted">${l.telefone||''} · ${sourceBadge(l.fonte)}</span></span><span>${statusBadge(l.status)}</span></li>`).join('')}</ul>`}
+        <ul class="recent-list">${recentes_leads.map(l=>`<li onclick="goToLead(${l.id})"><span><strong>${l.nome}</strong><br><span class="text-muted">${l.telefone||''} · ${sourceBadge(l.fonte)}</span></span><span>${statusBadge(l.status)}</span></li>`).join('')}</ul>`}
       </div>
       <div class="panel">
-        <div class="panel-header"><h2>🧾 Últimas Invoices</h2><button class="btn btn-sm btn-outline" onclick="showPage('invoices')">Ver todas</button></div>
+        <div class="panel-header"><h2 class="link-ref" style="font-size:1.1rem" onclick="showPage('invoices')">🧾 Últimas Invoices</h2><button class="btn btn-sm btn-outline" onclick="showPage('invoices')">Ver todas</button></div>
         ${recentes_inv.length===0?'<p class="text-muted" style="text-align:center;padding:20px">Nenhuma invoice ainda</p>':`
-        <ul class="recent-list">${recentes_inv.map(i=>`<li><span><strong class="inv-num">${invNumero(i)}</strong> – ${clienteNome(i.clienteId)}<br><span class="text-muted">${fmtDate(i.dataEmissao)} · ${fmt(i.total)}</span></span><span>${statusBadge(invStatusAtual(i))}</span></li>`).join('')}</ul>`}
+        <ul class="recent-list">${recentes_inv.map(i=>`<li onclick="goToInvoice(${i.id})"><span><strong class="inv-num">${invNumero(i)}</strong> – ${clienteNome(i.clienteId)}<br><span class="text-muted">${fmtDate(i.dataEmissao)} · ${fmt(i.total)}</span></span><span>${statusBadge(invStatusAtual(i))}</span></li>`).join('')}</ul>`}
       </div>
     </div>`;
 }
@@ -962,7 +981,7 @@ function renderOrcamentos() {
       <div class="table-wrap"><table>
         <thead><tr><th>#</th><th>Cliente</th><th>Serviço</th><th>Data</th><th>Total</th><th>Status</th><th>Ações</th></tr></thead>
         <tbody>${lista.length===0?'<tr class="empty-row"><td colspan="7">Nenhum orçamento</td></tr>':lista.map(o=>`<tr>
-          <td><strong>#${o.id}</strong></td><td>${clienteNome(o.clienteId)}</td><td>${servicoLabel(o.servico)}</td>
+          <td><strong class="link-ref" onclick="abrirModalOrc(${o.id})">#${o.id}</strong></td><td><span class="link-ref" onclick="goToCliente(${o.clienteId})">${clienteNome(o.clienteId)}</span></td><td>${servicoLabel(o.servico)}</td>
           <td>${fmtDate(o.data)}</td><td><strong>${fmt(orcTotal(o))}</strong></td><td>${statusBadge(o.status)}</td>
           <td><div class="flex-gap">
             ${(o.attachments||[]).length?`<span class="anexo-badge">📎 ${(o.attachments||[]).length}</span>`:''}
@@ -1152,8 +1171,8 @@ function renderOrdens() {
       <div class="table-wrap"><table>
         <thead><tr><th>#</th><th>Cliente</th><th>Serviço</th><th>Técnico</th><th>📅 Agendada</th><th>Início</th><th>Fim</th><th>Status</th><th>Ações</th></tr></thead>
         <tbody>${lista.length===0?'<tr class="empty-row"><td colspan="8">Nenhuma ordem</td></tr>':lista.map(o=>`<tr>
-          <td><strong>#${o.id}</strong>${o.orcamentoId?`<br><span class="text-muted">Orc #${o.orcamentoId}</span>`:''}</td>
-          <td>${clienteNome(o.clienteId)}</td><td>${servicoLabel(o.servico)}</td><td>${o.tecnico||'-'}</td>
+          <td><strong class="link-ref" onclick="abrirModalOrdem(${o.id})">#${o.id}</strong>${o.orcamentoId?`<br><span class="link-ref" onclick="goToOrc(${o.orcamentoId})">📋 Orc #${o.orcamentoId}</span>`:''}</td>
+          <td><span class="link-ref" onclick="goToCliente(${o.clienteId})">${clienteNome(o.clienteId)}</span></td><td>${servicoLabel(o.servico)}</td><td>${o.tecnico||'-'}</td>
           <td><strong>${fmtDate(o.dataAgendada||o.dataInicio)}</strong>${o.horaAgendada?'<br><small>'+o.horaAgendada+'</small>':''}</td><td>${fmtDate(o.dataInicio)}</td><td>${fmtDate(o.dataFim)||'-'}</td><td>${statusBadge(o.status)}</td>
           <td><div class="flex-gap">
             ${(o.attachments||[]).length?`<span class="anexo-badge">📎 ${(o.attachments||[]).length}</span>`:''}
@@ -1433,7 +1452,7 @@ function renderAgendaLista() {
           <div class="agenda-item-cor" style="background:${stColors[o.status]||'#6b7280'}"></div>
           <div class="agenda-item-info">
             <div class="agenda-item-title">
-              <strong>#${o.id}</strong> — ${clienteNome(o.clienteId)}
+              <strong>#${o.id}</strong> — <span class="link-ref" onclick="event.stopPropagation();goToCliente(${o.clienteId})">${clienteNome(o.clienteId)}</span>
               ${o.horaAgendada?`<span class="agenda-hora">🕐 ${o.horaAgendada}</span>`:''}
             </div>
             <div class="agenda-item-sub">${servicoLabel(o.servico)} ${o.tecnico?'• 👷 '+o.tecnico:''}</div>
@@ -1469,8 +1488,8 @@ function renderInvoices() {
       <div class="table-wrap"><table>
         <thead><tr><th>Invoice #</th><th>Cliente</th><th>Serviço</th><th>Emissão</th><th>Vencimento</th><th>Total</th><th>Status</th><th>Ações</th></tr></thead>
         <tbody>${lista.length===0?'<tr class="empty-row"><td colspan="8">Nenhuma invoice</td></tr>':lista.map(i=>`<tr>
-          <td><strong class="inv-num">${invNumero(i)}</strong>${i.osId?`<br><span class="text-muted">OS #${i.osId}</span>`:''}</td>
-          <td>${clienteNome(i.clienteId)}</td><td>${servicoLabel(i.servico)}</td>
+          <td><strong class="inv-num link-ref" onclick="abrirModalInvoice(${i.id})">${invNumero(i)}</strong>${i.osId?`<br><span class="link-ref" onclick="goToOrdem(${i.osId})">🔧 OS #${i.osId}</span>`:''}</td>
+          <td><span class="link-ref" onclick="goToCliente(${i.clienteId})">${clienteNome(i.clienteId)}</span></td><td>${servicoLabel(i.servico)}</td>
           <td>${fmtDate(i.dataEmissao)}</td>
           <td style="${invStatusAtual(i)==='Vencido'?'color:var(--danger);font-weight:600':''}">${fmtDate(i.dataVenc)}</td>
           <td><strong>${fmt(i.total)}</strong></td>
@@ -2293,8 +2312,8 @@ function renderContasReceber() {
     <div class="table-wrap"><table>
       <thead><tr><th>Invoice</th><th>Cliente</th><th>Serviço</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead>
       <tbody>${lista.length===0?'<tr class="empty-row"><td colspan="7">Nenhuma conta a receber</td></tr>':lista.map(i=>`<tr>
-        <td><strong class="inv-num">${invNumero(i)}</strong></td>
-        <td>${clienteNome(i.clienteId)}</td><td>${servicoLabel(i.servico)}</td>
+        <td><strong class="inv-num link-ref" onclick="goToInvoice(${i.id})">${invNumero(i)}</strong></td>
+        <td><span class="link-ref" onclick="goToCliente(${i.clienteId})">${clienteNome(i.clienteId)}</span></td><td>${servicoLabel(i.servico)}</td>
         <td style="${invStatusAtual(i)==='Vencido'?'color:var(--danger);font-weight:600':''}">${fmtDate(i.dataVenc)}</td>
         <td><strong>${fmt(i.total)}</strong></td><td>${statusBadge(invStatusAtual(i))}</td>
         <td><div class="flex-gap">
