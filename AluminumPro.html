@@ -1660,6 +1660,51 @@ function renderSettings() {
         </div>
       </div>
 
+
+      <div style="margin-bottom:28px">
+        <h3 style="font-size:.85rem;text-transform:uppercase;color:var(--text-muted);letter-spacing:.5px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">📥 Importar do HouseCall Pro</h3>
+        <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:16px;border:1px solid var(--border)">
+          <p style="font-size:.85rem;font-weight:700;color:var(--text);margin:0 0 10px">Como exportar seus dados do HouseCall Pro:</p>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            ${[
+              ['👥','Clientes','Reports → Customer List → Export (CSV)'],
+              ['🔧','Jobs / Ordens','Reports → Job History → Export (CSV)'],
+              ['📋','Estimates / Orçamentos','Reports → Estimates → Export (CSV)'],
+              ['🧾','Invoices','Reports → Invoices → Export (CSV)']
+            ].map(([ic,lb,path])=>`<div style="display:flex;align-items:center;gap:8px">
+              <span>${ic}</span>
+              <span style="font-size:.8rem;color:var(--text-muted)"><strong style="color:var(--text)">${lb}:</strong> ${path}</span>
+            </div>`).join('')}
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group span2">
+            <label>👥 Clientes (CSV)</label>
+            <input type="file" accept=".csv,.txt" onchange="onHcpFile(event,'clientes')" style="padding:6px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);width:100%">
+            <div id="hcp-preview-clientes" style="font-size:.8rem;margin-top:5px"></div>
+          </div>
+          <div class="form-group span2">
+            <label>🔧 Jobs / Ordens de Serviço (CSV)</label>
+            <input type="file" accept=".csv,.txt" onchange="onHcpFile(event,'jobs')" style="padding:6px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);width:100%">
+            <div id="hcp-preview-jobs" style="font-size:.8rem;margin-top:5px"></div>
+          </div>
+          <div class="form-group span2">
+            <label>📋 Estimates / Orçamentos (CSV)</label>
+            <input type="file" accept=".csv,.txt" onchange="onHcpFile(event,'estimates')" style="padding:6px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);width:100%">
+            <div id="hcp-preview-estimates" style="font-size:.8rem;margin-top:5px"></div>
+          </div>
+          <div class="form-group span2">
+            <label>🧾 Invoices (CSV)</label>
+            <input type="file" accept=".csv,.txt" onchange="onHcpFile(event,'invoices')" style="padding:6px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);width:100%">
+            <div id="hcp-preview-invoices" style="font-size:.8rem;margin-top:5px"></div>
+          </div>
+        </div>
+        <div style="margin-top:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="importarHCP()" style="background:linear-gradient(135deg,#0066ff,#00b4ff)">📥 Importar para o App</button>
+          <span style="font-size:.78rem;color:var(--text-muted)">Duplicatas (mesmo nome) são ignoradas automaticamente.</span>
+        </div>
+      </div>
+
       <div style="display:flex;gap:10px;justify-content:flex-end">
         <button class="btn btn-primary" onclick="salvarSettings()">💾 Salvar Configurações</button>
       </div>
@@ -2058,6 +2103,223 @@ async function salvarAnexosPendentes(type,recordId){
   }
   _pendingAnexos=[];
   salvar();
+}
+
+
+// ===== HOUSECALL PRO CSV IMPORTER =====
+let _hcpData = { clientes: null, jobs: null, estimates: null, invoices: null };
+
+function _parseCSV(text) {
+  // Normalize line endings
+  text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const parseRow = line => {
+    const res = []; let inQ = false; let cur = '';
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { if (inQ && line[i+1]==='"') { cur+='"'; i++; } else inQ=!inQ; }
+      else if (ch===',' && !inQ) { res.push(cur.trim()); cur=''; }
+      else cur += ch;
+    }
+    res.push(cur.trim()); return res;
+  };
+  const rawHeaders = parseRow(lines[0]);
+  const headers = rawHeaders.map(h => h.toLowerCase().replace(/[\s\-\/]+/g,'_').replace(/[^a-z0-9_]/g,''));
+  return lines.slice(1).map(line => {
+    if (!line.trim()) return null;
+    const vals = parseRow(line);
+    const obj = {}; headers.forEach((h,i) => obj[h] = (vals[i]||'').trim()); return obj;
+  }).filter(r => r && Object.values(r).some(v=>v));
+}
+
+function _hcpCol(row) {
+  // Returns a function that tries multiple column name variants
+  return (...keys) => {
+    for (const k of keys) {
+      const norm = k.toLowerCase().replace(/[\s\-\/]+/g,'_').replace(/[^a-z0-9_]/g,'');
+      if (row[norm] !== undefined && row[norm] !== '') return row[norm];
+    }
+    return '';
+  };
+}
+
+function _hcpParseDate(s) {
+  if (!s) return '';
+  // Try MM/DD/YYYY or YYYY-MM-DD or M/D/YYYY
+  const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m1) return `${m1[3]}-${m1[1].padStart(2,'0')}-${m1[2].padStart(2,'0')}`;
+  const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m2) return s.substring(0,10);
+  return '';
+}
+
+function _hcpMoney(s) {
+  if (!s) return 0;
+  return parseFloat(s.toString().replace(/[$,\s]/g,'')) || 0;
+}
+
+function onHcpFile(event, tipo) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const rows = _parseCSV(e.target.result);
+      _hcpData[tipo] = rows;
+      const el = document.getElementById('hcp-preview-'+tipo);
+      if (el) el.innerHTML = `<span style="color:#22c55e;font-weight:600">✅ ${rows.length} registros encontrados</span>` +
+        (rows.length > 0 ? `<span style="color:var(--text-muted);margin-left:8px">Colunas: ${Object.keys(rows[0]).slice(0,5).join(', ')}${Object.keys(rows[0]).length>5?'...':''}</span>` : '');
+    } catch(err) {
+      const el = document.getElementById('hcp-preview-'+tipo);
+      if (el) el.innerHTML = `<span style="color:#ef4444">❌ Erro ao ler arquivo: ${err.message}</span>`;
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function importarHCP() {
+  const total = Object.values(_hcpData).filter(x=>x&&x.length>0).length;
+  if (total === 0) { toast('Selecione ao menos um arquivo CSV para importar.','error'); return; }
+
+  const counts = { clientes:0, jobs:0, estimates:0, invoices:0 };
+  const erros = [];
+
+  // STATUS HELPERS
+  const statusOrdem = s => { s=(s||'').toLowerCase(); if(/complet|done|finish|conclu/.test(s))return'Concluído'; if(/progress|active|andamento|work/.test(s))return'Em Andamento'; if(/cancel/.test(s))return'Cancelado'; return'Agendado'; };
+  const statusOrc = s => { s=(s||'').toLowerCase(); if(/approv|accept|won|aprovad/.test(s))return'Aprovado'; if(/declin|reject|lost|recusad/.test(s))return'Recusado'; return'Pendente'; };
+  const statusInv = s => { s=(s||'').toLowerCase(); if(/paid|pago/.test(s))return'Pago'; if(/sent|enviad|open/.test(s))return'Enviado'; if(/cancel/.test(s))return'Cancelado'; return'Rascunho'; };
+
+  // FIND CLIENT BY NAME
+  const findCliente = name => {
+    if(!name) return null;
+    const nl = name.toLowerCase().trim();
+    const e = db.clientes.find(c=>c.nome.toLowerCase()===nl); if(e) return e.id;
+    const p = db.clientes.find(c=>c.nome.toLowerCase().includes(nl)||nl.includes(c.nome.toLowerCase())); return p?p.id:null;
+  };
+
+  // 1. IMPORT CUSTOMERS
+  if (_hcpData.clientes && _hcpData.clientes.length > 0) {
+    for (const r of _hcpData.clientes) {
+      const g = _hcpCol(r);
+      let nome = g('customer_name','full_name','name','contact_name') ||
+                 (g('first_name','firstname') + ' ' + g('last_name','lastname')).trim();
+      const empresa = g('company','company_name','business_name');
+      if (!nome && empresa) nome = empresa;
+      if (!nome) continue;
+      if (db.clientes.some(c=>c.nome.toLowerCase()===nome.toLowerCase())) continue; // skip dup
+      db.clientes.push({
+        id: nextId('clientes'),
+        nome,
+        telefone: g('mobile_number','mobile','phone','cell_phone','home_number','work_number'),
+        email: g('email','email_address'),
+        endereco: [g('address','street','street_address'), g('city'), g('state'), g('zip','zip_code','postal_code')].filter(x=>x).join(', '),
+        obs: [empresa?`Empresa: ${empresa}`:'', g('notes','customer_notes','tags')].filter(x=>x).join(' | ') || ''
+      });
+      counts.clientes++;
+    }
+  }
+
+  // 2. IMPORT JOBS → Ordens de Serviço
+  if (_hcpData.jobs && _hcpData.jobs.length > 0) {
+    for (const r of _hcpData.jobs) {
+      const g = _hcpCol(r);
+      const clienteNome = g('customer_name','customer','client_name','client');
+      const clienteId = findCliente(clienteNome);
+      if (!clienteId) { erros.push(`Job sem cliente: "${clienteNome||'(vazio)'}"`); continue; }
+      db.ordens.push({
+        id: nextId('ordens'),
+        clienteId,
+        orcamentoId: null,
+        servico: 'outro',
+        tecnico: g('assigned_employee','employee','technician','tech','assigned_to','assigned'),
+        dataInicio: _hcpParseDate(g('job_start_date','start_date','scheduled_date','date','created_at')) || today(),
+        dataFim: _hcpParseDate(g('job_end_date','end_date','completed_date','completion_date')) || '',
+        status: statusOrdem(g('status','job_status')),
+        obs: [g('job_description','description','notes','work_order','job_type'), g('address','street')?`Endereço: ${g('address','street')} ${g('city')} ${g('state')} ${g('zip','zip_code')}`.trim():''].filter(x=>x).join('\n') || '',
+        attachments: []
+      });
+      counts.jobs++;
+    }
+  }
+
+  // 3. IMPORT ESTIMATES → Orçamentos
+  if (_hcpData.estimates && _hcpData.estimates.length > 0) {
+    for (const r of _hcpData.estimates) {
+      const g = _hcpCol(r);
+      const clienteNome = g('customer_name','customer','client_name','client');
+      const clienteId = findCliente(clienteNome);
+      if (!clienteId) { erros.push(`Estimate sem cliente: "${clienteNome||'(vazio)'}"`); continue; }
+      const total = _hcpMoney(g('total','estimate_total','amount','subtotal','grand_total'));
+      db.orcamentos.push({
+        id: nextId('orcamentos'),
+        clienteId,
+        servico: 'outro',
+        data: _hcpParseDate(g('estimate_date','date','created_date','created_at')) || today(),
+        validade: _hcpParseDate(g('valid_until','expiration_date','expire_date')) || '',
+        status: statusOrc(g('status','estimate_status')),
+        desconto: _hcpMoney(g('discount','discount_amount')),
+        descricao: g('description','notes','job_description','message') || '',
+        itens: [{ tipo:'outro', desc: g('description','job_type','line_item','notes') || 'Serviço importado', qty:1, preco:total }],
+        attachments: []
+      });
+      counts.estimates++;
+    }
+  }
+
+  // 4. IMPORT INVOICES
+  if (_hcpData.invoices && _hcpData.invoices.length > 0) {
+    for (const r of _hcpData.invoices) {
+      const g = _hcpCol(r);
+      const clienteNome = g('customer_name','customer','client_name','client');
+      const clienteId = findCliente(clienteNome);
+      if (!clienteId) { erros.push(`Invoice sem cliente: "${clienteNome||'(vazio)'}"`); continue; }
+      const desconto = _hcpMoney(g('discount','discount_amount'));
+      const total = _hcpMoney(g('total','invoice_total','amount','grand_total','balance_due'));
+      const subtotal = _hcpMoney(g('subtotal','sub_total')) || (total + desconto);
+      db.invoices.push({
+        id: nextId('invoices'),
+        clienteId,
+        servico: 'outro',
+        dataEmissao: _hcpParseDate(g('invoice_date','date','created_date','created_at')) || today(),
+        dataVenc: _hcpParseDate(g('due_date','payment_due')) || '',
+        status: statusInv(g('status','invoice_status','payment_status')),
+        paymentTerms: g('terms','payment_terms') || 'Net 30',
+        tecnico: g('technician','tech','employee','assigned_to') || '',
+        notas: g('notes','description','memo','job_description') || '',
+        itens: [{ tipo:'outro', desc: g('description','job_type','line_item') || 'Serviço', qty:1, preco:subtotal }],
+        subtotal,
+        desconto,
+        total,
+        attachments: []
+      });
+      counts.invoices++;
+    }
+  }
+
+  salvar();
+
+  const linhas = [
+    counts.clientes > 0 ? `✅ <strong>${counts.clientes}</strong> clientes importados` : '',
+    counts.jobs > 0 ? `✅ <strong>${counts.jobs}</strong> ordens de serviço importadas` : '',
+    counts.estimates > 0 ? `✅ <strong>${counts.estimates}</strong> orçamentos importados` : '',
+    counts.invoices > 0 ? `✅ <strong>${counts.invoices}</strong> invoices importadas` : ''
+  ].filter(x=>x).join('<br>');
+
+  abrirModal('📥 Importação Concluída', `
+    <div style="padding:16px 0">
+      <div style="font-size:2.5rem;text-align:center;margin-bottom:14px">🎉</div>
+      <p style="font-size:.95rem;color:var(--text);line-height:2;margin-bottom:${erros.length>0?'14':'0'}px">${linhas||'<span style="color:var(--text-muted)">Nenhum registro importado.</span>'}</p>
+      ${erros.length>0?`<div style="background:rgba(255,193,7,.08);border:1px solid rgba(255,193,7,.25);border-radius:8px;padding:12px">
+        <p style="font-size:.82rem;font-weight:600;color:#ffc107;margin:0 0 8px">⚠️ ${erros.length} registro${erros.length>1?'s':''} ignorado${erros.length>1?'s':''} (cliente não encontrado)</p>
+        <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 8px">Dica: importe os <strong>Clientes primeiro</strong>, depois os outros dados.</p>
+        <details><summary style="font-size:.78rem;cursor:pointer;color:var(--text-muted)">Ver lista (${erros.length})</summary>
+          <ul style="font-size:.76rem;color:var(--text-muted);margin:8px 0 0;padding-left:16px;max-height:140px;overflow-y:auto">${erros.slice(0,50).map(e=>`<li>${e}</li>`).join('')}${erros.length>50?`<li>...e mais ${erros.length-50}</li>`:''}</ul>
+        </details>
+      </div>`:''}
+    </div>
+  `, '<button class="btn btn-primary" onclick="fecharModal()">OK</button>');
+
+  _hcpData = { clientes:null, jobs:null, estimates:null, invoices:null };
 }
 
 function abrirModal(titulo, corpo, footer, maxW='620px') {
