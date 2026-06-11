@@ -697,6 +697,7 @@ function renderInvoices() {
             <button class="btn btn-sm btn-gray" onclick="imprimirInvoice(${i.id})">🖨️</button>
             ${i.status!=='Pago'?`<button class="btn btn-sm" style="background:#0ea5e9;color:#fff" onclick="abrirPagamento(${i.id})">💳 Pay Now</button>`:''}
             ${i.status!=='Pago'&&db.settings.gateway==='stripe_netlify'?`<button class="btn btn-sm" style="background:#8b5cf6;color:#fff" title="Copiar link de pagamento Stripe" onclick="gerarLinkPagamento(${i.id})">📋 Link</button>`:''}
+            ${(()=>{const _ec=db.clientes.find(x=>x.id==i.clienteId);return _ec?.email?`<button class="btn btn-sm" style="background:#10b981;color:#fff" title="Enviar invoice por email para ${_ec.email}" onclick="enviarInvoiceEmail(${i.id})">📧 Email</button>`:'';})()}
             ${i.status!=='Pago'?`<button class="btn btn-sm btn-success" onclick="marcarPago(${i.id})">✅ Pago</button>`:''}
             <button class="btn btn-sm btn-danger" onclick="deletarInvoice(${i.id})">🗑️</button>
           </div></td></tr>`).join('')}</tbody>
@@ -952,6 +953,68 @@ async function gerarLinkPagamento(invId) {
   } catch(err) {
     toast('Erro ao gerar link: ' + err.message, 'error');
     console.error('Stripe link error:', err);
+  }
+}
+
+async function enviarInvoiceEmail(invId) {
+  const inv = db.invoices.find(x=>x.id==invId); if(!inv) return;
+  const c = db.clientes.find(x=>x.id==inv.clienteId);
+  if(!c?.email){ toast('⚠️ Cliente sem email cadastrado! Adicione o email no cadastro do cliente.', 'error'); return; }
+  const s = db.settings;
+  const isNetlify = window.location.hostname.includes('netlify.app') || window.location.hostname.includes('alumicraft');
+  const BASE = isNetlify ? '' : 'https://alumicraft-stripe.netlify.app';
+  toast('⏳ Preparando email...', 'info');
+  try {
+    // Gera link Stripe se ainda não existe e gateway está configurado
+    let payLink = inv.stripePayLink || null;
+    if (!payLink && s.gateway === 'stripe_netlify') {
+      try {
+        const r = await fetch(BASE + '/.netlify/functions/create-checkout', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            amount: inv.total, invoiceId: inv.id, invoiceNum: invNumero(inv),
+            clientName: c.nome, clientEmail: c.email, servico: servicoLabel(inv.servico),
+            successUrl: 'https://alumicraft-stripe.netlify.app/aluminumpro.html?paid=' + inv.id,
+            cancelUrl:  'https://alumicraft-stripe.netlify.app/aluminumpro.html'
+          })
+        });
+        const d = await r.json();
+        if (!d.error && d.url) {
+          payLink = d.url;
+          const idx = db.invoices.findIndex(x=>x.id==invId);
+          if(idx>=0){ db.invoices[idx].stripePayLink = d.url; db.invoices[idx].stripeSessionId = d.sessionId; salvar(); }
+        }
+      } catch(e) { /* segue sem link se falhar */ }
+    }
+    // Envia o email
+    toast('📧 Enviando email...', 'info');
+    const resp = await fetch(BASE + '/.netlify/functions/send-invoice', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        to:          c.email,
+        clientName:  c.nome,
+        invoiceNum:  invNumero(inv),
+        total:       inv.total,
+        subtotal:    inv.subtotal,
+        discount:    inv.desconto,
+        dueDate:     fmtDate(inv.dataVenc),
+        servico:     servicoLabel(inv.servico),
+        payLink,
+        items:       inv.itens,
+        notes:       inv.notas
+      })
+    });
+    const data = await resp.json();
+    if(data.error) throw new Error(data.error);
+    // Atualiza status para Enviado se era Rascunho
+    const idx = db.invoices.findIndex(x=>x.id==invId);
+    if(idx>=0 && db.invoices[idx].status === 'Rascunho'){
+      db.invoices[idx].status = 'Enviado'; salvar(); renderInvoices();
+    }
+    toast(`✅ Invoice enviada para ${c.email}!`, 'success');
+  } catch(err) {
+    toast('Erro ao enviar email: ' + err.message, 'error');
+    console.error('Email error:', err);
   }
 }
 
