@@ -1326,95 +1326,59 @@ function imprimirOrc(id) {
   const o=db.orcamentos.find(x=>x.id==id); if(!o)return;
   const c=db.clientes.find(x=>x.id==o.clienteId);
   const total=orcTotal(o); const ofsc=parseFloat(o.ofsconto||0);
-  const logoHtml=getLogoForPrint();
-  const companyBlock=getCompanyBlock();
+  const logoHtml=getLogoForPrint(); const companyBlock=getCompanyBlock();
   const win=window.open('','_blank');
-  win.document.write(`<html><head><title>Estimate #EST-${String(o.id).padStart(4,'0')}</title>
-  <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Helvetica Neue',Arial,sans-serif;padding:40px;max-width:780px;margin:auto;color:#2d3a52;font-size:13.5px;background:#fff}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #1a5fa8}
-  .company-siof{display:flex;flex-direction:column;gap:3px}
-  .company-name{font-size:13px;font-weight:700;color:#1a5fa8;margin-top:6px}
-  .doc-meta{text-align:right}
-  .doc-title{font-size:30px;font-weight:900;color:#1a5fa8;letter-spacing:1px;line-height:1}
-  .doc-meta p{font-size:12px;color:#6b7a99;margin-top:4px}
-  .section-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
-  .info-box{background:#f7f9fc;padding:14px 16px;border-radius:8px;border-left:4px solid #1a5fa8}
-  .info-box h3{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:8px}
-  .info-box p{font-size:13px;line-height:1.7;color:#2d3a52}
-  table{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:13px}
-  thead tr{background:#1a5fa8}
-  th{padding:10px 12px;text-align:left;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;color:#fff}
-  th:last-child,td:last-child{text-align:right}
-  td{padding:10px 12px;border-bottom:1px solid #eaeff6;color:#2d3a52}
-  tr:nth-child(even) td{background:#f9fafc}
-  .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:20px}
-  .totals{width:280px}
-  .tot-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eaeff6;font-size:13px}
-  .tot-row.grand{background:#1a5fa8;color:#fff;font-weight:800;font-size:15px;padding:12px 14px;border-radius:8px;border:none;margin-top:4px}
-  .tot-row.disc{color:#c62828}
-  .notes-box{background:#f7f9fc;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:13px;border-left:4px solid #94a3b8}
-  .notes-box h4{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:6px}
-  .validity-banner{background:#e8f5e9;border-radius:8px;padding:10px 16px;margin-bottom:20px;font-size:12.5px;color:#2e7d32;font-weight:600;text-align:center}
-  .sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:36px}
-  .sig-line{border-top:1.5px solid #b0bbc8;padding-top:8px;font-size:11.5px;color:#8a97b0;text-align:center}
-  .footer{margin-top:24px;padding-top:14px;border-top:1px solid #eaeff6;font-size:11.5px;color:#8a97b0;text-align:center;line-height:1.8}
-  @media print{body{padding:24px}}
-  </style></head><body>
-  <div class="header">
-    <div class="company-siof">
-      ${logoHtml}
-      <div class="company-name">AlumiCraft – Aluminum Industry</div>
-      ${companyBlock}
-    </div>
-    <div class="doc-meta">
-      <div class="doc-title">ESTIMATE</div>
-      <p style="font-weight:700;font-size:13px;margin-top:6px">#EST-${String(o.id).padStart(4,'0')}</p>
-      <p>Date: <strong>${fmtDate(o.data)}</strong></p>
-      ${o.validaof?`<p>Valid Until: <strong>${fmtDate(o.validaof)}</strong></p>`:''}
-    </div>
-  </div>
-  ${o.validaof?`<div class="validity-banner">📋 This estimate is valid until ${fmtDate(o.validaof)} · Subject to material price changes</div>`:''}
-  <div class="section-grid">
-    <div class="info-box">
-      <h3>Bill To / Client</h3>
-      <p><strong>${c?.nome||'-'}</strong><br>
-      ${c?.telefone?`📞 ${c.telefone}<br>`:''}
-      ${c?.email?`✉️ ${c.email}<br>`:''}
-      ${c?.address?`📍 ${c.address}`:''}</p>
-    </div>
-    <div class="info-box">
-      <h3>Estimate Details</h3>
-      <p>Service: <strong>${servicoLabel(o.servico)}</strong><br>
-      ${o.tecnico?`Assigned To: <strong>${o.tecnico}</strong><br>`:''}
-      Status: <strong>${o.status||'Pending'}</strong></p>
-    </div>
-  </div>
-  <table>
-    <thead><tr><th>#</th><th>Type</th><th>Description</th><th>Qty / ft</th><th>Unit Price</th><th>Amount</th></tr></thead>
-    <tbody>
-    ${(o.itens||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${servicoLabel(it.tipo)}</td><td>${it.ofsc||'-'}</td><td style="text-align:right">${it.qty}</td><td style="text-align:right">$ ${parseFloat(it.preco||0).toFixed(2)}</td><td style="text-align:right">$ ${(parseFloat(it.qty||0)*parseFloat(it.preco||0)).toFixed(2)}</td></tr>`).join('')}
-    </tbody>
-  </table>
-  <div class="totals-wrap">
-    <div class="totals">
-      <div class="tot-row"><span>Subtotal</span><span>$ ${total.toFixed(2)}</span></div>
-      ${ofsc>0?`<div class="tot-row disc"><span>Discount</span><span>-$ ${ofsc.toFixed(2)}</span></div>`:''}
-      <div class="tot-row grand"><span>TOTAL</span><span>$ ${(total-ofsc).toFixed(2)}</span></div>
-    </div>
-  </div>
-  ${o.ofscricao?`<div class="notes-box"><h4>Notes / Scope of Work</h4><p>${o.ofscricao}</p></div>`:''}
-  <div class="sig-grid">
-    <div class="sig-line">Client Signature &amp; Date</div>
-    <div class="sig-line">Authorized By &amp; Date</div>
-  </div>
-  <div class="footer">
-    <p><strong>AlumiCraft – Aluminum Industry</strong> | Estimate #EST-${String(o.id).padStart(4,'0')}</p>
-    <p>Gutters · Soffit · Pool Cage · Carport · Railing · Screen Enclosure</p>
-    <p style="margin-top:4px">Acceptance of this estimate authorizes AlumiCraft to proceed with the described work.</p>
-  </div>
-  <script>window.onload=()=>window.print()<\/script></body></html>`);win.document.close();
+  const num='EST-'+String(o.numero||o.id||'').padStart(4,'0');
+  const dt=fmtDate(o.dataOrcamento||o.data||'');
+  const scls=o.status==='Approved'?'b-green':o.status==='Rejected'?'b-red':o.status==='Sent'?'b-blue':'b-amber';
+  const subtotal=total+ofsc;
+  let rows=''; let alt=false;
+  (o.items||[]).forEach(function(it){
+    const u=parseFloat(it.valorUnit||0),q=parseFloat(it.qtde||1);
+    rows+='<tr'+(alt?' class="alt"':'')+'><td><div class="desc">'+(it.descricao||'')+'</div>'
+      +'<div class="sub">Qty: '+q+'</div></td>'
+      +'<td class="r">'+fmtCurr(u)+'</td>'
+      +'<td class="r">'+fmtCurr(u*q)+'</td></tr>';
+    alt=!alt;
+  });
+  const css='* { margin: 0; padding: 0; box-sizing: border-box; }\n@page { size: letter; margin: 0.5in; }\nbody { font-family: \'Segoe UI\', system-ui, -apple-system, Arial, sans-serif; background: #fff; color: #1e293b; font-size: 13px; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.ph { background: linear-gradient(135deg, #0a1628 0%, #1a3a6e 100%); padding: 26px 40px; display: flex; justify-content: space-between; align-items: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.ph-logo img { max-height: 55px; max-width: 160px; object-fit: contain; filter: brightness(0) invert(1); }\n.ph-logo img[src*=\'data:image/png\'] { filter: none; }\n.ph-right { text-align: right; }\n.ph-doctype { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: 4px; text-transform: uppercase; }\n.ph-num { font-size: 13px; color: #93c5fd; letter-spacing: 1px; margin-top: 3px; }\n.accent { height: 4px; background: linear-gradient(90deg, #1d6fe8 0%, #c87a14 100%); -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.info-row { display: flex; padding: 22px 40px; gap: 32px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.info-box { flex: 1; }\n.info-box h4 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #64748b; margin-bottom: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }\n.info-name { font-size: 15px; font-weight: 700; color: #0a1628; margin-bottom: 3px; }\n.info-text { font-size: 12px; color: #475569; line-height: 1.7; }\n.meta-strip { display: flex; background: #fff; border-bottom: 1px solid #e2e8f0; }\n.meta-item { flex: 1; padding: 12px 20px; border-right: 1px solid #e2e8f0; }\n.meta-item:last-child { border-right: none; }\n.meta-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #94a3b8; margin-bottom: 3px; }\n.meta-value { font-size: 13px; font-weight: 600; color: #1e293b; }\n.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.b-green { background: #dcfce7; color: #166534; }\n.b-amber { background: #fef3c7; color: #92400e; }\n.b-blue { background: #dbeafe; color: #1d4ed8; }\n.b-red { background: #fee2e2; color: #991b1b; }\n.b-gray { background: #f1f5f9; color: #475569; }\n.section-pad { padding: 22px 40px 0; }\ntable { width: 100%; border-collapse: collapse; }\nthead tr { background: #0a1628; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\nth { padding: 10px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; color: #fff; }\nth.r, td.r { text-align: right; }\ntd { padding: 10px 14px; font-size: 12.5px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }\ntr.alt td { background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.desc { font-weight: 600; color: #1e293b; }\n.sub { font-size: 11px; color: #64748b; margin-top: 2px; }\n.totals-wrap { padding: 16px 40px 20px; }\n.totals-inner { width: 300px; margin-left: auto; }\n.t-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9; color: #475569; }\n.t-row span:last-child { font-weight: 600; color: #1e293b; }\n.t-final { background: #0a1628; color: #fff; padding: 12px 16px; border-radius: 6px; margin-top: 8px; font-weight: 700; font-size: 15px; display: flex; justify-content: space-between; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.notes-wrap { padding: 0 40px 20px; }\n.note-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 6px; }\n.note-body { padding: 12px 16px; background: #f8fafc; border-left: 3px solid #1d6fe8; border-radius: 0 6px 6px 0; font-size: 12.5px; color: #374151; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.sig-area { display: flex; gap: 40px; margin: 16px 40px; padding: 20px 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.sig-item { flex: 1; }\n.sig-line { border-top: 1.5px solid #334155; margin-top: 44px; padding-top: 6px; font-size: 11px; color: #64748b; }\n.doc-footer { margin: 0 40px; padding: 14px 0 24px; border-top: 1.5px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; }\n.footer-co { font-size: 11px; color: #64748b; line-height: 1.7; }\n.footer-right { text-align: right; }\n.footer-thanks { font-size: 13px; color: #1d6fe8; font-weight: 600; }\n.footer-tagline { font-size: 11px; color: #94a3b8; font-style: italic; margin-top: 2px; }\n.detail-card { margin: 16px 40px; padding: 18px 22px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }\n.detail-card h4 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #64748b; margin-bottom: 10px; }\n.detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }\n.dg-item label { font-size: 9.5px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; display: block; margin-bottom: 2px; }\n.dg-item span { font-size: 13px; font-weight: 600; color: #1e293b; }';
+  const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+num+'</title>'
+    +'<style>'+css+'</style></head><body>'
+    +'<div class="ph"><div class="ph-logo">'+logoHtml+'</div>'
+    +'<div class="ph-right"><div class="ph-doctype">Estimate</div><div class="ph-num">'+num+'</div></div></div>'
+    +'<div class="accent"></div>'
+    +'<div class="info-row">'
+    +'<div class="info-box"><h4>From</h4><div class="info-text">'+companyBlock+'</div></div>'
+    +'<div class="info-box"><h4>Estimate For</h4>'
+    +'<div class="info-name">'+(c&&(c.nome||c.name)?String(c.nome||c.name):'—')+'</div>'
+    +'<div class="info-text">'
+    +(c&&c.email?String(c.email)+'<br>':'')
+    +(c&&c.telefone?String(c.telefone)+'<br>':'')
+    +(c&&c.endereco?String(c.endereco):'')
+    +'</div></div></div>'
+    +'<div class="meta-strip">'
+    +'<div class="meta-item"><div class="meta-label">Date</div><div class="meta-value">'+dt+'</div></div>'
+    +'<div class="meta-item"><div class="meta-label">Valid For</div><div class="meta-value">30 Days</div></div>'
+    +'<div class="meta-item"><div class="meta-label">Payment</div><div class="meta-value">'+(o.condpagto||'—')+'</div></div>'
+    +'<div class="meta-item"><div class="meta-label">Status</div><div class="meta-value"><span class="badge '+scls+'">'+(o.status||'Draft')+'</span></div></div>'
+    +'</div>'
+    +'<div class="section-pad"><table>'
+    +'<thead><tr><th>Description</th><th class="r">Unit Price</th><th class="r">Amount</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table></div>'
+    +'<div class="totals-wrap"><div class="totals-inner">'
+    +(ofsc>0?'<div class="t-row"><span>Subtotal</span><span>'+fmtCurr(subtotal)+'</span></div>'
+      +'<div class="t-row"><span>Discount</span><span>- '+fmtCurr(ofsc)+'</span></div>':'')
+    +'<div class="t-final"><span>Total Due</span><span>'+fmtCurr(total)+'</span></div>'
+    +'</div></div>'
+    +(o.observacoes?'<div class="notes-wrap"><div class="note-label">Notes &amp; Terms</div><div class="note-body">'+String(o.observacoes)+'</div></div>':'')
+    +'<div class="doc-footer">'
+    +'<div class="footer-co">'+companyBlock+'</div>'
+    +'<div class="footer-right"><div class="footer-thanks">Thank you for choosing us!</div>'
+    +'<div class="footer-tagline">This estimate is valid for 30 days from the date above.</div></div>'
+    +'</div>'
+    +'<script>window.print()<\/script></body></html>';
+  win.document.write(html);
+  win.document.close();
 }
 
 // ===== ORDENS DE SERVIÇO =====
@@ -1490,98 +1454,50 @@ function ofletarOrdem(id){if(!confirm('Deletar ordem?'))return;db.ordens=db.orde
 function imprimirOS(id) {
   const o=db.ordens.find(x=>x.id==id); if(!o)return;
   const c=db.clientes.find(x=>x.id==o.clienteId);
-  const orc=o.orcamentoId?db.orcamentos.find(x=>x.id==o.orcamentoId):null;
-  const logoHtml=getLogoForPrint();
-  const companyBlock=getCompanyBlock();
-  const statusColor={'Scheduled':'#1a5fa8','In Progress':'#f59e0b','Completed':'#22c55e','Cancelled':'#ef4444'};
+  const logoHtml=getLogoForPrint(); const companyBlock=getCompanyBlock();
   const win=window.open('','_blank');
-  win.document.write(`<html><head><title>Work Order #WO-${String(o.id).padStart(4,'0')}</title>
-  <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Helvetica Neue',Arial,sans-serif;padding:40px;max-width:780px;margin:auto;color:#2d3a52;font-size:13.5px;background:#fff}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #1a5fa8}
-  .company-siof{display:flex;flex-direction:column;gap:3px}
-  .company-name{font-size:13px;font-weight:700;color:#1a5fa8;margin-top:6px}
-  .doc-meta{text-align:right}
-  .doc-title{font-size:28px;font-weight:900;color:#1a5fa8;letter-spacing:1.5px;line-height:1}
-  .doc-meta p{font-size:12px;color:#6b7a99;margin-top:4px}
-  .status-badge{display:inline-block;padding:5px 16px;border-radius:20px;font-size:12px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:20px}
-  .section-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
-  .info-box{background:#f7f9fc;padding:14px 16px;border-radius:8px;border-left:4px solid #1a5fa8}
-  .info-box h3{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:8px}
-  .info-box p{font-size:13px;line-height:1.8;color:#2d3a52}
-  table{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:13px}
-  thead tr{background:#1a5fa8}
-  th{padding:10px 12px;text-align:left;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;color:#fff}
-  th:last-child,td:last-child{text-align:right}
-  td{padding:10px 12px;border-bottom:1px solid #eaeff6;color:#2d3a52}
-  tr:nth-child(even) td{background:#f9fafc}
-  .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:20px}
-  .totals{width:260px}
-  .tot-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eaeff6;font-size:13px}
-  .tot-row.grand{background:#1a5fa8;color:#fff;font-weight:800;font-size:15px;padding:12px 14px;border-radius:8px;border:none;margin-top:4px}
-  .notes-box{background:#f7f9fc;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:13px;border-left:4px solid #94a3b8}
-  .notes-box h4{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:6px}
-  .sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:36px}
-  .sig-line{border-top:1.5px solid #b0bbc8;padding-top:8px;font-size:11.5px;color:#8a97b0;text-align:center}
-  .footer{margin-top:24px;padding-top:14px;border-top:1px solid #eaeff6;font-size:11.5px;color:#8a97b0;text-align:center;line-height:1.8}
-  @media print{body{padding:24px}}
-  </style></head><body>
-  <div class="header">
-    <div class="company-siof">
-      ${logoHtml}
-      <div class="company-name">AlumiCraft – Aluminum Industry</div>
-      ${companyBlock}
-    </div>
-    <div class="doc-meta">
-      <div class="doc-title">WORK ORDER</div>
-      <p style="font-weight:700;font-size:13px;margin-top:6px">#WO-${String(o.id).padStart(4,'0')}</p>
-      <p>Issued: <strong>${fmtDate(o.dataInicio)}</strong></p>
-      ${o.dataFim?`<p>Due: <strong>${fmtDate(o.dataFim)}</strong></p>`:''}
-      ${o.orcamentoId?`<p>Estimate Ref: <strong>#EST-${String(o.orcamentoId).padStart(4,'0')}</strong></p>`:''}
-    </div>
-  </div>
-  <div style="margin-bottom:18px">
-    <span class="status-badge" style="background:${statusColor[o.status]||'#1a5fa8'}">${o.status}</span>
-  </div>
-  <div class="section-grid">
-    <div class="info-box">
-      <h3>Job Site / Client Address</h3>
-      <p><strong>${c?.nome||'-'}</strong><br>
-      ${c?.address?`📍 ${c.address}`:'<em style="color:#8a97b0">No address on file</em>'}</p>
-    </div>
-    <div class="info-box">
-      <h3>Service Details</h3>
-      <p>Type: <strong>${servicoLabel(o.servico)}</strong><br>
-      ${o.tecnico?`Technician: <strong>${o.tecnico}</strong><br>`:''}
-      Start: <strong>${fmtDate(o.dataInicio)}</strong><br>
-      ${o.dataFim?`Completion: <strong>${fmtDate(o.dataFim)}</strong>`:'Completion: <em>TBD</em>'}</p>
-    </div>
-  </div>
-  ${orc&&orc.itens&&orc.itens.length>0?`
-  <table>
-    <thead><tr><th>#</th><th>Type</th><th>Description</th><th style="text-align:right">Qty / ft</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead>
-    <tbody>
-    ${orc.itens.map((it,i)=>`<tr><td>${i+1}</td><td>${servicoLabel(it.tipo)}</td><td>${it.ofsc||'-'}</td><td style="text-align:right">${it.qty}</td><td style="text-align:right">$ ${parseFloat(it.preco||0).toFixed(2)}</td><td style="text-align:right">$ ${(parseFloat(it.qty||0)*parseFloat(it.preco||0)).toFixed(2)}</td></tr>`).join('')}
-    </tbody>
-  </table>
-  <div class="totals-wrap">
-    <div class="totals">
-      ${(()=>{const t=orc.itens.reduce((s,it)=>s+parseFloat(it.qty||0)*parseFloat(it.preco||0),0);const d=parseFloat(orc.ofsconto||0);return `<div class="tot-row"><span>Subtotal</span><span>$ ${t.toFixed(2)}</span></div>${d>0?`<div class="tot-row" style="color:#c62828"><span>Discount</span><span>-$ ${d.toFixed(2)}</span></div>`:''}<div class="tot-row grand"><span>Estimated Total</span><span>$ ${(t-d).toFixed(2)}</span></div>`;})()}
-    </div>
-  </div>`
-  :`<div class="notes-box"><h4>Scope of Work</h4><p>${o.obs||'To be offined on site.'}</p></div>`}
-  ${o.obs?`<div class="notes-box"><h4>Notes / Special Instructions</h4><p>${o.obs}</p></div>`:''}
-  <div class="sig-grid">
-    <div class="sig-line">Client Signature &amp; Date</div>
-    <div class="sig-line">Technician Signature &amp; Date</div>
-  </div>
-  <div class="footer">
-    <p><strong>AlumiCraft – Aluminum Industry</strong> | Work Order #WO-${String(o.id).padStart(4,'0')}</p>
-    <p>Gutters · Soffit · Pool Cage · Carport · Railing · Screen Enclosure</p>
-    <p style="margin-top:4px">This document authorizes AlumiCraft to perform the services described above.</p>
-  </div>
-  <script>window.onload=()=>window.print()<\/script></body></html>`);
+  const num='WO-'+String(o.numero||o.id||'').padStart(4,'0');
+  const scls=o.status==='Completed'?'b-green':o.status==='In Progress'?'b-blue':o.status==='Cancelled'?'b-red':'b-amber';
+  const css='* { margin: 0; padding: 0; box-sizing: border-box; }\n@page { size: letter; margin: 0.5in; }\nbody { font-family: \'Segoe UI\', system-ui, -apple-system, Arial, sans-serif; background: #fff; color: #1e293b; font-size: 13px; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.ph { background: linear-gradient(135deg, #0a1628 0%, #1a3a6e 100%); padding: 26px 40px; display: flex; justify-content: space-between; align-items: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.ph-logo img { max-height: 55px; max-width: 160px; object-fit: contain; filter: brightness(0) invert(1); }\n.ph-logo img[src*=\'data:image/png\'] { filter: none; }\n.ph-right { text-align: right; }\n.ph-doctype { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: 4px; text-transform: uppercase; }\n.ph-num { font-size: 13px; color: #93c5fd; letter-spacing: 1px; margin-top: 3px; }\n.accent { height: 4px; background: linear-gradient(90deg, #1d6fe8 0%, #c87a14 100%); -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.info-row { display: flex; padding: 22px 40px; gap: 32px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.info-box { flex: 1; }\n.info-box h4 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #64748b; margin-bottom: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }\n.info-name { font-size: 15px; font-weight: 700; color: #0a1628; margin-bottom: 3px; }\n.info-text { font-size: 12px; color: #475569; line-height: 1.7; }\n.meta-strip { display: flex; background: #fff; border-bottom: 1px solid #e2e8f0; }\n.meta-item { flex: 1; padding: 12px 20px; border-right: 1px solid #e2e8f0; }\n.meta-item:last-child { border-right: none; }\n.meta-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #94a3b8; margin-bottom: 3px; }\n.meta-value { font-size: 13px; font-weight: 600; color: #1e293b; }\n.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.b-green { background: #dcfce7; color: #166534; }\n.b-amber { background: #fef3c7; color: #92400e; }\n.b-blue { background: #dbeafe; color: #1d4ed8; }\n.b-red { background: #fee2e2; color: #991b1b; }\n.b-gray { background: #f1f5f9; color: #475569; }\n.section-pad { padding: 22px 40px 0; }\ntable { width: 100%; border-collapse: collapse; }\nthead tr { background: #0a1628; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\nth { padding: 10px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; color: #fff; }\nth.r, td.r { text-align: right; }\ntd { padding: 10px 14px; font-size: 12.5px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }\ntr.alt td { background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.desc { font-weight: 600; color: #1e293b; }\n.sub { font-size: 11px; color: #64748b; margin-top: 2px; }\n.totals-wrap { padding: 16px 40px 20px; }\n.totals-inner { width: 300px; margin-left: auto; }\n.t-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9; color: #475569; }\n.t-row span:last-child { font-weight: 600; color: #1e293b; }\n.t-final { background: #0a1628; color: #fff; padding: 12px 16px; border-radius: 6px; margin-top: 8px; font-weight: 700; font-size: 15px; display: flex; justify-content: space-between; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.notes-wrap { padding: 0 40px 20px; }\n.note-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 6px; }\n.note-body { padding: 12px 16px; background: #f8fafc; border-left: 3px solid #1d6fe8; border-radius: 0 6px 6px 0; font-size: 12.5px; color: #374151; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.sig-area { display: flex; gap: 40px; margin: 16px 40px; padding: 20px 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.sig-item { flex: 1; }\n.sig-line { border-top: 1.5px solid #334155; margin-top: 44px; padding-top: 6px; font-size: 11px; color: #64748b; }\n.doc-footer { margin: 0 40px; padding: 14px 0 24px; border-top: 1.5px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; }\n.footer-co { font-size: 11px; color: #64748b; line-height: 1.7; }\n.footer-right { text-align: right; }\n.footer-thanks { font-size: 13px; color: #1d6fe8; font-weight: 600; }\n.footer-tagline { font-size: 11px; color: #94a3b8; font-style: italic; margin-top: 2px; }\n.detail-card { margin: 16px 40px; padding: 18px 22px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }\n.detail-card h4 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #64748b; margin-bottom: 10px; }\n.detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }\n.dg-item label { font-size: 9.5px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; display: block; margin-bottom: 2px; }\n.dg-item span { font-size: 13px; font-weight: 600; color: #1e293b; }';
+  const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+num+'</title>'
+    +'<style>'+css+'</style></head><body>'
+    +'<div class="ph"><div class="ph-logo">'+logoHtml+'</div>'
+    +'<div class="ph-right"><div class="ph-doctype">Work Order</div><div class="ph-num">'+num+'</div></div></div>'
+    +'<div class="accent"></div>'
+    +'<div class="info-row">'
+    +'<div class="info-box"><h4>Company</h4><div class="info-text">'+companyBlock+'</div></div>'
+    +'<div class="info-box"><h4>Client</h4>'
+    +'<div class="info-name">'+(c&&(c.nome||c.name)?String(c.nome||c.name):'—')+'</div>'
+    +'<div class="info-text">'
+    +(c&&c.email?String(c.email)+'<br>':'')
+    +(c&&c.telefone?String(c.telefone)+'<br>':'')
+    +(c&&c.endereco?String(c.endereco):'')
+    +'</div></div></div>'
+    +'<div class="meta-strip">'
+    +'<div class="meta-item"><div class="meta-label">Scheduled</div><div class="meta-value">'+fmtDate(o.dataAgendada||'')+(o.horaAgendada?' at '+o.horaAgendada:'')+'</div></div>'
+    +'<div class="meta-item"><div class="meta-label">Technician</div><div class="meta-value">'+(o.tecnico||'—')+'</div></div>'
+    +'<div class="meta-item"><div class="meta-label">Status</div><div class="meta-value"><span class="badge '+scls+'">'+(o.status||'Pending')+'</span></div></div>'
+    +'<div class="meta-item"><div class="meta-label">Reference</div><div class="meta-value">'+num+'</div></div>'
+    +'</div>'
+    +'<div class="detail-card"><h4>Service Details</h4>'
+    +'<div style="font-size:14px;font-weight:600;color:#0a1628;margin-bottom:8px">'+(o.servico||o.descricao||'—')+'</div>'
+    +(o.notas||o.observacoes?'<div style="font-size:12.5px;color:#475569;line-height:1.7">'+String(o.notas||o.observacoes)+'</div>':'')
+    +'</div>'
+    +(o.itens&&o.itens.length?'<div class="section-pad" style="padding-bottom:20px"><table><thead><tr><th>Item / Service</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Total</th></tr></thead><tbody>'
+      +o.itens.map(function(it,i){const u=parseFloat(it.valorUnit||0),q=parseFloat(it.qtde||1);return '<tr'+(i%2?' class="alt"':'')+'><td class="desc">'+(it.descricao||'')+'</td><td class="r">'+q+'</td><td class="r">'+fmtCurr(u)+'</td><td class="r">'+fmtCurr(u*q)+'</td></tr>';}).join('')
+      +'</tbody></table></div>':'')
+    +'<div class="sig-area">'
+    +'<div class="sig-item"><div class="sig-line">Client Signature</div></div>'
+    +'<div class="sig-item"><div class="sig-line">Date of Completion</div></div>'
+    +'<div class="sig-item"><div class="sig-line">Technician Signature</div></div>'
+    +'</div>'
+    +'<div class="doc-footer">'
+    +'<div class="footer-co">'+companyBlock+'</div>'
+    +'<div class="footer-right"><div class="footer-thanks">Thank you for trusting us!</div>'
+    +'<div class="footer-tagline">Please keep this work order for your records.</div></div>'
+    +'</div>'
+    +'<script>window.print()<\/script></body></html>';
+  win.document.write(html);
   win.document.close();
 }
 
@@ -1830,99 +1746,64 @@ function ofletarInvoice(id){if(!confirm('Deletar invoice?'))return;db.invoices=d
 
 function imprimirInvoice(id) {
   const inv=db.invoices.find(x=>x.id==id); if(!inv)return;
-  const c=clienteObj(inv.clienteId);
-  const num=invNumero(inv);
-  const logoHtml=getLogoForPrint();
-  const companyBlock=getCompanyBlock();
-  const statusAtual=invStatusAtual(inv);
+  const c=db.clientes.find(x=>x.id==inv.clienteId);
+  const logoHtml=getLogoForPrint(); const companyBlock=getCompanyBlock();
   const win=window.open('','_blank');
-  win.document.write(`<html><head><title>${num}</title>
-  <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Helvetica Neue',Arial,sans-serif;padding:40px;max-width:780px;margin:auto;color:#2d3a52;font-size:13.5px;background:#fff}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #1a5fa8}
-  .company-siof{display:flex;flex-direction:column;gap:3px}
-  .company-name{font-size:13px;font-weight:700;color:#1a5fa8;margin-top:6px}
-  .doc-meta{text-align:right}
-  .doc-title{font-size:30px;font-weight:900;color:#1a5fa8;letter-spacing:1px;line-height:1}
-  .doc-meta p{font-size:12px;color:#6b7a99;margin-top:4px}
-  .status-chip{display:inline-block;padding:3px 12px;border-radius:12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;margin-top:6px}
-  .section-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
-  .info-box{background:#f7f9fc;padding:14px 16px;border-radius:8px;border-left:4px solid #1a5fa8}
-  .info-box h3{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:8px}
-  .info-box p{font-size:13px;line-height:1.8;color:#2d3a52}
-  table{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:13px}
-  thead tr{background:#1a5fa8}
-  th{padding:10px 12px;text-align:left;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;color:#fff}
-  th:last-child,td:last-child{text-align:right}
-  td{padding:10px 12px;border-bottom:1px solid #eaeff6;color:#2d3a52}
-  tr:nth-child(even) td{background:#f9fafc}
-  .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:20px}
-  .totals{width:290px}
-  .tot-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eaeff6;font-size:13px}
-  .tot-row.grand{background:#1a5fa8;color:#fff;font-weight:800;font-size:15px;padding:12px 14px;border-radius:8px;border:none;margin-top:4px}
-  .tot-row.disc{color:#c62828}
-  .banner{border-radius:8px;padding:12px 18px;margin-bottom:20px;font-size:13px;font-weight:700;text-align:center}
-  .banner.paid{background:#e8f5e9;color:#2e7d32}
-  .banner.overdue{background:#fce4ec;color:#c62828}
-  .notes-box{background:#f7f9fc;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:13px;border-left:4px solid #94a3b8}
-  .notes-box h4{font-size:10.5px;text-transform:uppercase;color:#8a97b0;letter-spacing:0.6px;font-weight:700;margin-bottom:6px}
-  .pay-box{background:linear-gradient(135ofg,#635bff12,#635bff06);border:2px solid #635bff40;border-radius:12px;padding:18px;margin-bottom:20px;text-align:center}
-  .footer{margin-top:24px;padding-top:14px;border-top:1px solid #eaeff6;font-size:11.5px;color:#8a97b0;text-align:center;line-height:1.8}
-  @media print{body{padding:24px}}
-  </style></head><body>
-  <div class="header">
-    <div class="company-siof">
-      ${logoHtml}
-      <div class="company-name">AlumiCraft – Aluminum Industry</div>
-      ${companyBlock}
-    </div>
-    <div class="doc-meta">
-      <div class="doc-title">INVOICE</div>
-      <p style="font-weight:700;font-size:13px;margin-top:6px">${num}</p>
-      <p>Date: <strong>${fmtDate(inv.dataEmissao)}</strong></p>
-      <p>Due: <strong>${fmtDate(inv.dataVenc)}</strong></p>
-      <div><span class="status-chip" style="background:${statusAtual==='Paid'?'#e8f5e9':statusAtual==='Overdue'?'#fce4ec':'#e8f0fb'};color:${statusAtual==='Paid'?'#2e7d32':statusAtual==='Overdue'?'#c62828':'#1a5fa8'}">${statusAtual}</span></div>
-    </div>
-  </div>
-  ${inv.status==='Paid'?`<div class="banner paid">✅ PAID – Payment received on ${fmtDate(inv.dataPagamento||inv.dataEmissao)}</div>`:statusAtual==='Overdue'?`<div class="banner overdue">⚠️ OVERDUE – Payment was due on ${fmtDate(inv.dataVenc)}</div>`:''}
-  <div class="section-grid">
-    <div class="info-box">
-      <h3>Bill To</h3>
-      <p><strong>${c.nome||'-'}</strong><br>
-      ${c.telefone?`📞 ${c.telefone}<br>`:''}
-      ${c.email?`✉️ ${c.email}<br>`:''}
-      ${c.address?`📍 ${c.address}`:''}</p>
-    </div>
-    <div class="info-box">
-      <h3>Invoice Details</h3>
-      <p>Service: <strong>${servicoLabel(inv.servico)}</strong><br>
-      ${inv.tecnico?`Technician: <strong>${inv.tecnico}</strong><br>`:''}
-      ${inv.osId?`Work Order: <strong>#WO-${String(inv.osId).padStart(4,'0')}</strong><br>`:''}
-      Payment Terms: <strong>${inv.paymentTerms||'Net 30'}</strong></p>
-    </div>
-  </div>
-  <table>
-    <thead><tr><th>#</th><th>Type</th><th>Description</th><th style="text-align:right">Qty / ft</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead>
-    <tbody>
-    ${(inv.itens||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${servicoLabel(it.tipo)}</td><td>${it.ofsc||'-'}</td><td style="text-align:right">${it.qty}</td><td style="text-align:right">$ ${parseFloat(it.preco||0).toFixed(2)}</td><td style="text-align:right">$ ${(parseFloat(it.qty||0)*parseFloat(it.preco||0)).toFixed(2)}</td></tr>`).join('')}
-    </tbody>
-  </table>
-  <div class="totals-wrap">
-    <div class="totals">
-      <div class="tot-row"><span>Subtotal</span><span>$ ${parseFloat(inv.subtotal||0).toFixed(2)}</span></div>
-      ${parseFloat(inv.ofsconto||0)>0?`<div class="tot-row disc"><span>Discount</span><span>-$ ${parseFloat(inv.ofsconto||0).toFixed(2)}</span></div>`:''}
-      <div class="tot-row grand"><span>TOTAL DUE</span><span>$ ${parseFloat(inv.total||0).toFixed(2)}</span></div>
-    </div>
-  </div>
-  ${inv.notas?`<div class="notes-box"><h4>Notes / Payment Terms</h4><p>${inv.notas}</p></div>`:''}
-  ${inv.stripePayLink&&inv.status!=='Paid'?`<div class="pay-box"><p style="font-size:14px;font-weight:800;color:#635bff;margin:0 0 8px">⚡ PAY ONLINE – SECURE STRIPE CHECKOUT</p><p style="font-size:12px;color:#6b7a99;margin:0 0 12px">Pay $ ${parseFloat(inv.total||0).toFixed(2)} with Visa, Mastercard, Apple Pay or Google Pay</p><a href="${inv.stripePayLink}" style="display:inline-block;background:#635bff;color:#fff;padding:11px 30px;border-radius:8px;font-size:14px;font-weight:800;text-ofcoration:none">💳 Pay Now – $ ${parseFloat(inv.total||0).toFixed(2)}</a></div>`:(()=>{const pl=db.settings?.paymentLink||'';if(!pl)return '';const u=pl.startsWith('http')?pl:'https://'+pl;return `<div class="pay-box"><p style="font-size:13px;color:#0369a1;font-weight:700;margin:0 0 6px">💳 Pay Online – Secure Card Payment</p><p style="margin:0;font-size:12px;color:#0369a1;word-break:break-all"><a href="${u}" style="color:#0369a1">${u}</a></p></div>`;})()}
-  <div class="footer">
-    <p><strong>AlumiCraft – Aluminum Industry</strong> | ${num}</p>
-    <p>Gutters · Soffit · Pool Cage · Carport · Railing · Screen Enclosure</p>
-    <p style="margin-top:4px">Thank you for your business! Please reference the invoice number with your payment.</p>
-  </div>
-  <script>window.onload=()=>window.print()<\/script></body></html>`);
+  const num='INV-'+String(inv.numero||inv.id||'').padStart(4,'0');
+  const scls=inv.status==='Paid'?'b-green':inv.status==='Overdue'?'b-red':inv.status==='Sent'?'b-blue':'b-amber';
+  const subtotal=parseFloat(inv.subtotal||inv.total||0);
+  const tax=parseFloat(inv.tax||inv.imposto||0);
+  const disc=parseFloat(inv.discount||inv.desconto||0);
+  const totalDue=subtotal+tax-disc;
+  let rows=''; let alt=false;
+  (inv.items||inv.itens||[]).forEach(function(it){
+    const u=parseFloat(it.valorUnit||it.price||it.unitPrice||0),q=parseFloat(it.qtde||it.qty||1);
+    rows+='<tr'+(alt?' class="alt"':'')+'><td><div class="desc">'+(it.descricao||it.description||'')+'</div>'
+      +'<div class="sub">Qty: '+q+'</div></td>'
+      +'<td class="r">'+fmtCurr(u)+'</td>'
+      +'<td class="r">'+fmtCurr(u*q)+'</td></tr>';
+    alt=!alt;
+  });
+  const dueDate=inv.dueDate||inv.dataVencimento||'';
+  const css='* { margin: 0; padding: 0; box-sizing: border-box; }\n@page { size: letter; margin: 0.5in; }\nbody { font-family: \'Segoe UI\', system-ui, -apple-system, Arial, sans-serif; background: #fff; color: #1e293b; font-size: 13px; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.ph { background: linear-gradient(135deg, #0a1628 0%, #1a3a6e 100%); padding: 26px 40px; display: flex; justify-content: space-between; align-items: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.ph-logo img { max-height: 55px; max-width: 160px; object-fit: contain; filter: brightness(0) invert(1); }\n.ph-logo img[src*=\'data:image/png\'] { filter: none; }\n.ph-right { text-align: right; }\n.ph-doctype { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: 4px; text-transform: uppercase; }\n.ph-num { font-size: 13px; color: #93c5fd; letter-spacing: 1px; margin-top: 3px; }\n.accent { height: 4px; background: linear-gradient(90deg, #1d6fe8 0%, #c87a14 100%); -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.info-row { display: flex; padding: 22px 40px; gap: 32px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.info-box { flex: 1; }\n.info-box h4 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #64748b; margin-bottom: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }\n.info-name { font-size: 15px; font-weight: 700; color: #0a1628; margin-bottom: 3px; }\n.info-text { font-size: 12px; color: #475569; line-height: 1.7; }\n.meta-strip { display: flex; background: #fff; border-bottom: 1px solid #e2e8f0; }\n.meta-item { flex: 1; padding: 12px 20px; border-right: 1px solid #e2e8f0; }\n.meta-item:last-child { border-right: none; }\n.meta-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #94a3b8; margin-bottom: 3px; }\n.meta-value { font-size: 13px; font-weight: 600; color: #1e293b; }\n.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.b-green { background: #dcfce7; color: #166534; }\n.b-amber { background: #fef3c7; color: #92400e; }\n.b-blue { background: #dbeafe; color: #1d4ed8; }\n.b-red { background: #fee2e2; color: #991b1b; }\n.b-gray { background: #f1f5f9; color: #475569; }\n.section-pad { padding: 22px 40px 0; }\ntable { width: 100%; border-collapse: collapse; }\nthead tr { background: #0a1628; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\nth { padding: 10px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; color: #fff; }\nth.r, td.r { text-align: right; }\ntd { padding: 10px 14px; font-size: 12.5px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }\ntr.alt td { background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.desc { font-weight: 600; color: #1e293b; }\n.sub { font-size: 11px; color: #64748b; margin-top: 2px; }\n.totals-wrap { padding: 16px 40px 20px; }\n.totals-inner { width: 300px; margin-left: auto; }\n.t-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9; color: #475569; }\n.t-row span:last-child { font-weight: 600; color: #1e293b; }\n.t-final { background: #0a1628; color: #fff; padding: 12px 16px; border-radius: 6px; margin-top: 8px; font-weight: 700; font-size: 15px; display: flex; justify-content: space-between; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.notes-wrap { padding: 0 40px 20px; }\n.note-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 6px; }\n.note-body { padding: 12px 16px; background: #f8fafc; border-left: 3px solid #1d6fe8; border-radius: 0 6px 6px 0; font-size: 12.5px; color: #374151; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.sig-area { display: flex; gap: 40px; margin: 16px 40px; padding: 20px 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.sig-item { flex: 1; }\n.sig-line { border-top: 1.5px solid #334155; margin-top: 44px; padding-top: 6px; font-size: 11px; color: #64748b; }\n.doc-footer { margin: 0 40px; padding: 14px 0 24px; border-top: 1.5px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; }\n.footer-co { font-size: 11px; color: #64748b; line-height: 1.7; }\n.footer-right { text-align: right; }\n.footer-thanks { font-size: 13px; color: #1d6fe8; font-weight: 600; }\n.footer-tagline { font-size: 11px; color: #94a3b8; font-style: italic; margin-top: 2px; }\n.detail-card { margin: 16px 40px; padding: 18px 22px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }\n.detail-card h4 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #64748b; margin-bottom: 10px; }\n.detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }\n.dg-item label { font-size: 9.5px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; display: block; margin-bottom: 2px; }\n.dg-item span { font-size: 13px; font-weight: 600; color: #1e293b; }';
+  const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+num+'</title>'
+    +'<style>'+css+'</style></head><body>'
+    +'<div class="ph"><div class="ph-logo">'+logoHtml+'</div>'
+    +'<div class="ph-right"><div class="ph-doctype">Invoice</div><div class="ph-num">'+num+'</div></div></div>'
+    +'<div class="accent"></div>'
+    +'<div class="info-row">'
+    +'<div class="info-box"><h4>From</h4><div class="info-text">'+companyBlock+'</div></div>'
+    +'<div class="info-box"><h4>Bill To</h4>'
+    +'<div class="info-name">'+(c&&(c.nome||c.name)?String(c.nome||c.name):'—')+'</div>'
+    +'<div class="info-text">'
+    +(c&&c.email?String(c.email)+'<br>':'')
+    +(c&&c.telefone?String(c.telefone)+'<br>':'')
+    +(c&&c.endereco?String(c.endereco):'')
+    +'</div></div></div>'
+    +'<div class="meta-strip">'
+    +'<div class="meta-item"><div class="meta-label">Invoice Date</div><div class="meta-value">'+fmtDate(inv.data||inv.date||'')+'</div></div>'
+    +'<div class="meta-item"><div class="meta-label">Due Date</div><div class="meta-value">'+(dueDate?fmtDate(dueDate):'On Receipt')+'</div></div>'
+    +'<div class="meta-item"><div class="meta-label">Payment</div><div class="meta-value">'+(inv.condpagto||inv.paymentTerms||'—')+'</div></div>'
+    +'<div class="meta-item"><div class="meta-label">Status</div><div class="meta-value"><span class="badge '+scls+'">'+(inv.status||'Draft')+'</span></div></div>'
+    +'</div>'
+    +(rows?'<div class="section-pad"><table>'
+    +'<thead><tr><th>Description</th><th class="r">Unit Price</th><th class="r">Amount</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table></div>':'')
+    +'<div class="totals-wrap"><div class="totals-inner">'
+    +(disc>0?'<div class="t-row"><span>Subtotal</span><span>'+fmtCurr(subtotal)+'</span></div>'
+      +'<div class="t-row"><span>Discount</span><span>- '+fmtCurr(disc)+'</span></div>':'')
+    +(tax>0?'<div class="t-row"><span>Tax</span><span>'+fmtCurr(tax)+'</span></div>':'')
+    +(disc>0||tax>0?'':'')
+    +'<div class="t-final"><span>Total Due</span><span>'+fmtCurr(totalDue||subtotal)+'</span></div>'
+    +'</div></div>'
+    +(inv.observacoes||inv.notes?'<div class="notes-wrap"><div class="note-label">Notes</div><div class="note-body">'+String(inv.observacoes||inv.notes)+'</div></div>':'')
+    +'<div class="doc-footer">'
+    +'<div class="footer-co">'+companyBlock+'</div>'
+    +'<div class="footer-right"><div class="footer-thanks">Thank you for your business!</div>'
+    +'<div class="footer-tagline">Payment is due '+( dueDate?'by '+fmtDate(dueDate):'upon receipt')+'.</div></div>'
+    +'</div>'
+    +'<script>window.print()<\/script></body></html>';
+  win.document.write(html);
   win.document.close();
 }
 
