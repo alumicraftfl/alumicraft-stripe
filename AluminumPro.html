@@ -3820,6 +3820,80 @@ carregar();
   console.log('[AluminumPro] Feature patch loaded: backup, client-detail, full-screen-views, down-payment, discount-type');
 })();
 
+
+
+// ── DOWN PAYMENT TYPE ($ / %) PATCH ──────────────────────────────────────
+(function() {
+  var SELECT_HTML = ' <select id="f-dpType" style="margin-left:6px;padding:2px 8px;border-radius:4px;border:1px solid var(--border,#162030);background:var(--bg-input,#081220);color:var(--text,#c8d8ee);font-size:12px;"><option value="$">$ Fixed</option><option value="%">% of Total</option></select>';
+
+  function _addDpType() {
+    var dpEl = document.getElementById('f-downPayment');
+    if(!dpEl || document.getElementById('f-dpType')) return;
+    var grp = dpEl.closest('.form-group'); if(!grp) return;
+    var lbl = grp.querySelector('label'); if(!lbl) return;
+    lbl.innerHTML = 'Down Payment' + SELECT_HTML;
+    // restore saved type if editing
+    var saveBtn = document.querySelector('[onclick*="salvarOrc("]');
+    if(saveBtn) {
+      var m = saveBtn.getAttribute('onclick').match(/salvarOrc\((\d+)\)/);
+      var oId = m ? parseInt(m[1]) : 0;
+      if(oId > 0 && db && db.orcamentos) {
+        var rec = db.orcamentos.find(function(x){ return x.id == oId; });
+        if(rec) {
+          var dt = document.getElementById('f-dpType');
+          if(dt && rec.downPaymentType) dt.value = rec.downPaymentType;
+          if(rec.downPaymentType === '%' && rec.downPaymentPct != null) dpEl.value = rec.downPaymentPct;
+        }
+      }
+    }
+  }
+
+  // Hook modal openers
+  ['abrirModalOrc_orig','abrirModalOrc'].forEach(function(fn){
+    if(typeof window[fn] === 'function'){
+      var orig = window[fn];
+      window[fn] = function(id){ orig.apply(this,arguments); setTimeout(_addDpType,120); };
+    }
+  });
+
+  // MutationObserver fallback
+  new MutationObserver(function(muts){
+    muts.forEach(function(m){
+      m.addedNodes.forEach(function(node){
+        if(node.nodeType!==1) return;
+        if(node.querySelector && node.querySelector('#f-downPayment')) setTimeout(_addDpType,60);
+      });
+    });
+  }).observe(document.body,{childList:true,subtree:true});
+
+  // Wrap salvarOrc to handle % downPayment
+  var _prevSO = window.salvarOrc;
+  if(_prevSO) {
+    window.salvarOrc = function(id){
+      var dpTypeEl = document.getElementById('f-dpType');
+      var dpEl     = document.getElementById('f-downPayment');
+      _prevSO.apply(this,arguments);
+      var arr = db && db.orcamentos; if(!arr || !arr.length) return;
+      var rec = id ? arr.find(function(x){return x.id==id;}) : arr[arr.length-1];
+      if(!rec) return;
+      if(dpTypeEl) {
+        rec.downPaymentType = dpTypeEl.value;
+        if(dpTypeEl.value === '%' && dpEl) {
+          var pct = parseFloat(dpEl.value||0);
+          var total = typeof orcTotal==='function' ? orcTotal(rec) : 0;
+          rec.downPayment    = parseFloat((total*pct/100).toFixed(2));
+          rec.downPaymentPct = pct;
+        } else if(dpEl) {
+          rec.downPaymentPct = null;
+        }
+        if(typeof saveDB==='function') saveDB(); else if(typeof salvar==='function') salvar();
+      }
+    };
+  }
+
+  console.log('[AluminumPro] Down payment $/% patch loaded');
+})();
+
 </script>
 </body>
 </html>
