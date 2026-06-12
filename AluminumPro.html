@@ -506,7 +506,7 @@
     </div>
     <div class="topbar-right">
       <span id="cloud-badge" style="line-height:1"></span>
-      <div class="user-chip" id="user-chip" style="display:none"><div class="user-avatar" id="user-avatar">A</div><span id="user-name">Admin</span></div>
+      <div class="user-chip" id="user-chip" style="display:none;cursor:pointer" onclick="abrirMinhaSenha()" title="Click to change password"><div class="user-avatar" id="user-avatar">A</div><span id="user-name">Admin</span></div>
       <button class="logout-btn" id="logout-btn" style="display:none" onclick="logout()">🚪 Logout</button>
       <span id="topbar-logo-wrap"><span class="badge-empresa" id="topbar-logo-fallback" style="font-size:1.1rem;font-weight:800;letter-spacing:-0.3px">AlumiCraft</span></span>
       <button class="btn btn-sm btn-outline" onclick="exportarDados()">⬇️ Export</button>
@@ -739,6 +739,16 @@ function seedAdmin() {
     db._id.users = 2;
     salvar();
   }
+  // Recover passwordless users (e.g. imported via Firestore without passwords)
+  let _needsPwReset = false;
+  db.users.forEach(u => {
+    if(!u.password) {
+      u.password = hashPass('alumicraft2024');
+      u._pwReset = true;
+      _needsPwReset = true;
+    }
+  });
+  if(_needsPwReset) { salvarLocal(); if(window._syncEnabled) setTimeout(syncToCloud, 2000); }
 }
 
 function getSession() {
@@ -787,6 +797,7 @@ function doLogin() {
   showApp(user);
   // Navigate to first allowed page
   renderDashboard();
+  if(user._pwReset) { setTimeout(()=>abrirMinhaSenha(), 800); }
   paginaAtual='dashboard';
   document.querySelectorAll('#sidebar nav a').forEach(a=>a.classList.remove('active'));
   const nd=document.getElementById('nav-dashboard');
@@ -836,6 +847,64 @@ function applyPermissions(user) {
   vis('nav-financeiro', A||p.financeiro);
   vis('nav-settings',   A);
   vis('nav-usuarios',   A);
+}
+
+// ===== MINHA SENHA =====
+function abrirMinhaSenha() {
+  const me = currentUser();
+  if(!me) return;
+  let modal = document.getElementById('modal-minha-senha');
+  if(!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-minha-senha';
+    modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9998;justify-content:center;align-items:center';
+    modal.innerHTML = `
+      <div style="background:var(--bg-card);border-radius:14px;padding:32px;width:100%;max-width:400px;border:1px solid var(--border-bright);box-shadow:0 20px 60px rgba(0,0,0,.8)">
+        <h3 style="margin:0 0 6px;color:var(--text);font-size:1.05rem">🔑 Change Password</h3>
+        <p style="margin:0 0 20px;font-size:.82rem;color:var(--text-muted)" id="mpw-hint">Change your login password</p>
+        <div class="form-group" style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">New Password</label>
+          <input type="password" id="mpw-new" placeholder="Min 4 characters..." style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:7px;background:var(--bg-input);color:var(--text);font-size:.9rem;outline:none;box-sizing:border-box;margin-top:4px" onkeydown="if(event.key==='Enter')salvarMinhaSenha()">
+        </div>
+        <div class="form-group" style="margin-bottom:20px">
+          <label style="font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">Confirm Password</label>
+          <input type="password" id="mpw-confirm" placeholder="Repeat the password..." style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:7px;background:var(--bg-input);color:var(--text);font-size:.9rem;outline:none;box-sizing:border-box;margin-top:4px" onkeydown="if(event.key==='Enter')salvarMinhaSenha()">
+        </div>
+        <div id="mpw-err" style="color:#ff6060;font-size:.82rem;margin-bottom:12px;min-height:18px"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-outline" id="mpw-cancel-btn" onclick="document.getElementById('modal-minha-senha').style.display='none'">Cancel</button>
+          <button class="btn btn-primary" onclick="salvarMinhaSenha()">💾 Save Password</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  const isPwReset = !!me._pwReset;
+  document.getElementById('mpw-hint').textContent = isPwReset
+    ? '⚠️ Your account has a temporary password (alumicraft2024). Set a new personal password to continue.'
+    : 'Update your login password — minimum 4 characters.';
+  document.getElementById('mpw-cancel-btn').style.display = isPwReset ? 'none' : 'inline-flex';
+  document.getElementById('mpw-new').value = '';
+  document.getElementById('mpw-confirm').value = '';
+  document.getElementById('mpw-err').textContent = '';
+  modal.style.display = 'flex';
+  setTimeout(()=>document.getElementById('mpw-new').focus(), 100);
+}
+
+function salvarMinhaSenha() {
+  const me = currentUser();
+  if(!me) return;
+  const novaSenha = (document.getElementById('mpw-new').value||'');
+  const confirmar = (document.getElementById('mpw-confirm').value||'');
+  const errEl = document.getElementById('mpw-err');
+  if(!novaSenha || novaSenha.length < 4) { errEl.textContent = 'Password must be at least 4 characters.'; return; }
+  if(novaSenha !== confirmar) { errEl.textContent = 'Passwords do not match.'; return; }
+  const idx = db.users.findIndex(u=>u.id===me.id);
+  if(idx < 0) { errEl.textContent = 'User not found.'; return; }
+  db.users[idx].password = hashPass(novaSenha);
+  delete db.users[idx]._pwReset;
+  salvar();
+  document.getElementById('modal-minha-senha').style.display = 'none';
+  toast('✅ Password updated successfully!', 'success');
 }
 
 // ===== USUÁRIOS (admin) =====
@@ -952,7 +1021,7 @@ function salvarUsuario() {
     if(idx<0) return;
     db.users[idx].nome=nome;
     db.users[idx].username=username;
-    if(senha) db.users[idx].password=hashPass(senha);
+    if(senha) { db.users[idx].password=hashPass(senha); delete db.users[idx]._pwReset; }
     if(!db.users[idx].isAdmin){
       db.users[idx].perms={
         clientes:document.getElementById('p-clientes').checked,
