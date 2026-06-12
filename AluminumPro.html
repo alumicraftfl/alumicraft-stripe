@@ -266,7 +266,7 @@
     /* Topbar compact */
     #topbar { padding: 0 14px; height: 54px; }
     #topbar h1 { font-size: 0.95rem; }
-    .topbar-logo-img { display: none !important; }
+    .topbar-logo-img { display: inline-block; }
     .badge-empresa { display: none !important; }
     #user-name { display: none; }
     .topbar-right { gap: 6px; }
@@ -449,8 +449,8 @@
 <div id="login-overlay" class="show">
   <div class="login-box">
     <div class="login-logo">
-      <img src="logo.png" alt="AlumiCraft" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-      <div class="login-brand" style="display:none">🏗️ AlumiCraft</div>
+      <img src="https://www.alumicraft.net/manus-storage/alumicraft_logo_new_37adcacf.png" alt="AlumiCraft" style="height:60px;object-fit:contain;width:auto" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <div class="login-brand" style="display:none">AlumiCraft</div>
     </div>
     <h2>Welcome of volta!</h2>
     <p class="login-sub">Digite suas credenciais para acessar o sistema</p>
@@ -477,8 +477,8 @@
 
 <div id="sidebar">
   <div class="logo">
-    <img src="logo.png" alt="AlumiCraft" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-    <span style="display:none;align-items:center;gap:8px;font-size:1.1rem;font-weight:700;color:#fff">🏗️ AlumiCraft</span>
+    <img src="https://www.alumicraft.net/manus-storage/alumicraft_logo_new_37adcacf.png" alt="AlumiCraft" style="height:40px;object-fit:contain;width:auto" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <span style="display:none;align-items:center;gap:8px;font-size:1.1rem;font-weight:700;color:#fff">AlumiCraft</span>
   </div>
   <nav>
     <a class="active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="icon">📊</span> Dashboard</a>
@@ -508,7 +508,7 @@
       <span id="cloud-badge" style="line-height:1"></span>
       <div class="user-chip" id="user-chip" style="display:none"><div class="user-avatar" id="user-avatar">A</div><span id="user-name">Admin</span></div>
       <button class="logout-btn" id="logout-btn" style="display:none" onclick="logout()">🚪 Logout</button>
-      <span id="topbar-logo-wrap"><span class="badge-empresa" id="topbar-logo-fallback" style="font-size:1.1rem;font-weight:800;letter-spacing:-0.3px">🏗️ AlumiCraft</span></span>
+      <span id="topbar-logo-wrap"><span class="badge-empresa" id="topbar-logo-fallback" style="font-size:1.1rem;font-weight:800;letter-spacing:-0.3px">AlumiCraft</span></span>
       <button class="btn btn-sm btn-outline" onclick="exportarDados()">⬇️ Export</button>
       <button class="btn btn-sm btn-accent" onclick="importarDados()">⬆️ Importar</button>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="carregarArquivo(event)">
@@ -2370,7 +2370,7 @@ function updateTopbarLogo() {
   if (db.settings.logoBase64) {
     wrap.innerHTML = `<img src="${db.settings.logoBase64}" style="height:36px;max-width:140px;object-fit:contain;vertical-align:middle">`;
   } else {
-    wrap.innerHTML = `<span class="badge-empresa" style="font-size:1.1rem;font-weight:800;letter-spacing:-0.3px">🏗️ AlumiCraft</span>`;
+    wrap.innerHTML = `<span class="badge-empresa" style="font-size:1.1rem;font-weight:800;letter-spacing:-0.3px">AlumiCraft</span>`;
   }
 }
 
