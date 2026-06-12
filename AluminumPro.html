@@ -1057,6 +1057,42 @@ function renderDashboard() {
         ${recentes_inv.length===0?'<p class="text-muted" style="text-align:center;padding:20px">No invoices yet</p>':`
         <ul class="recent-list">${recentes_inv.map(i=>`<li onclick="goToInvoice(${i.id})"><span><strong class="inv-num">${invNumero(i)}</strong> – ${clienteNome(i.clienteId)}<br><span class="text-muted">${fmtDate(i.dataEmissao)} · ${fmt(i.total)}</span></span><span>${statusBadge(invStatusAtual(i))}</span></li>`).join('')}</ul>`}
       </div>
+    </div>
+    <div class="panel" style="margin-top:20px">
+      <div class="panel-header"><h2 class="link-ref" style="font-size:1.1rem" onclick="showPage('agenda')">📅 Upcoming Schedule</h2><button class="btn btn-sm btn-outline" onclick="showPage('agenda')">See all</button></div>
+      ${(()=>{
+        const todayStr = today();
+        const upcoming = db.ordens
+          .filter(o => o.dataAgendada && o.dataAgendada >= todayStr && !['Completed','Cancelled'].includes(o.status))
+          .sort((a,b)=>(a.dataAgendada+(a.horaAgendada||'00:00')).localeCompare(b.dataAgendada+(b.horaAgendada||'00:00')))
+          .slice(0,7);
+        if(upcoming.length === 0) return '<p class=\"text-muted\" style=\"text-align:center;padding:20px\">No upcoming jobs scheduled</p>';
+        let html = '<div style=\"padding:4px 0\">';
+        let lastDate = '';
+        upcoming.forEach(o => {
+          const isToday = o.dataAgendada === todayStr;
+          const isTomorrow = o.dataAgendada === (() => { const d=new Date(todayStr+'T12:00:00'); d.setDate(d.getDate()+1); return d.toISOString().substring(0,10); })();
+          const dateLabel = isToday ? '📍 Today' : isTomorrow ? '📅 Tomorrow' : '📅 '+fmtDate(o.dataAgendada);
+          if(o.dataAgendada !== lastDate) {
+            if(lastDate) html += '</div>';
+            html += '<div style=\"margin-bottom:8px\">';
+            html += '<div style=\"font-size:0.75rem;font-weight:700;text-transform:uppercase;color:'+(isToday?'#0066ff':'#888')+';letter-spacing:0.5px;padding:6px 0 4px 0\">'+ dateLabel +'</div>';
+            lastDate = o.dataAgendada;
+          }
+          const cor = o.status==='In Progress'?'#00b4ff':isToday?'#0066ff':'#94a3b8';
+          html += '<div onclick=\"goToOrdem('+o.id+')\" style=\"display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background 0.15s\" onmouseover=\"this.style.background=\'rgba(0,102,255,0.06)\'\" onmouseout=\"this.style.background=\'\'\">'+
+            '<div style=\"width:4px;height:36px;border-radius:4px;background:'+cor+';flex-shrink:0\"></div>'+
+            '<div style=\"flex:1;min-width:0\">'+
+              '<div style=\"font-weight:600;font-size:0.875rem\"><span style=\"color:'+cor+';margin-right:6px\">'+(o.horaAgendada||'—')+'</span>'+clienteNome(o.clienteId)+'</div>'+
+              '<div style=\"font-size:0.8rem;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis\">'+(o.servico||'No description')+(o.tecnico?' · 👤 '+o.tecnico:'')+'</div>'+
+            '</div>'+
+            '<div>'+statusBadge(o.status)+'</div>'+
+          '</div>';
+        });
+        if(lastDate) html += '</div>';
+        html += '</div>';
+        return html;
+      })()}
     </div>`;
 }
 
