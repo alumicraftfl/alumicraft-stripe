@@ -3358,6 +3358,468 @@ carregar();
   checkAuth();
   updateTopbarLogo();
 })();
+
+
+// =====================================================
+// ALUMINIUM PRO – FEATURE PATCH
+// 1. Hourly auto-backup + restore
+// 2. Clickable client names → full-screen client detail
+// 3. Full-screen detail views (Estimate / WO / Invoice)
+// 4. Down payment field in Quotes
+// 5. Discount type toggle ($ / %) in Quotes & Invoices
+// =====================================================
+(function() {
+  // ── HELPERS ──────────────────────────────────────────
+  function _stBadge(s) {
+    const m={Approved:'#dcfce7|#166534',Paid:'#dcfce7|#166534',Completed:'#dcfce7|#166534',
+      Rejected:'#fee2e2|#991b1b',Overdue:'#fee2e2|#991b1b',Cancelled:'#fee2e2|#991b1b',
+      Sent:'#dbeafe|#1d4ed8','In Progress':'#dbeafe|#1d4ed8'};
+    const c=(m[s]||'#fef3c7|#92400e').split('|');
+    return `<span style="font-size:11px;padding:3px 12px;border-radius:20px;font-weight:700;background:${c[0]};color:${c[1]};">${s||'Draft'}</span>`;
+  }
+  function _card(label,val) {
+    return `<div style="background:var(--bg,#070f1c);border-radius:10px;padding:14px;text-align:center;"><div style="color:var(--primary,#0066ff);font-size:20px;font-weight:800;">${val}</div><div style="color:var(--text-muted,#4d6a87);font-size:11px;margin-top:2px;">${label}</div></div>`;
+  }
+  function _row(label,val,bold) {
+    return `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border,#162030);font-size:13px;"><span style="color:var(--text-muted,#4d6a87);">${label}</span><span style="color:var(--text,#c8d8ee);font-weight:${bold?700:400};">${val}</span></div>`;
+  }
+  function _overlay(id) {
+    let el=document.getElementById(id);
+    if(!el){
+      el=document.createElement('div');
+      el.id=id;
+      el.style.cssText='position:fixed;inset:0;background:var(--bg,#070f1c);z-index:9000;overflow-y:auto;display:none;';
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function _backBtn(txt) {
+    return `<button onclick="document.getElementById(this.closest('[id]').id).style.display='none'" style="background:var(--primary,#0066ff);color:#fff;border:none;border-radius:8px;padding:9px 22px;font-size:14px;font-weight:600;cursor:pointer;flex-shrink:0;">${txt||'← Back'}</button>`;
+  }
+
+  // ── 1. CLIENT FULL-SCREEN DETAIL ─────────────────────
+  window.openClientDetail = function(cid) {
+    const c=db.clientes.find(x=>x.id==cid); if(!c) return;
+    const orcs=(db.orcamentos||[]).filter(x=>x.clienteId==cid);
+    const ords=(db.ordens||[]).filter(x=>x.clienteId==cid);
+    const invs=(db.invoices||[]).filter(x=>x.clienteId==cid);
+    const ov=_overlay('_cdov');
+    ov.innerHTML=`
+<div style="max-width:960px;margin:0 auto;padding:28px 20px;">
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+    ${_backBtn('← Back')}
+    <h1 style="color:var(--text,#c8d8ee);font-size:22px;font-weight:700;margin:0;">${c.nome||c.name||'Client'}</h1>
+    <button onclick="abrirModalCliente(${c.id})" style="margin-left:auto;background:transparent;border:1px solid var(--border,#162030);color:var(--text,#c8d8ee);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px;">✏️ Edit</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+    <div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;padding:20px;">
+      <div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px;">Contact Info</div>
+      ${c.email?`<div style="color:var(--text,#c8d8ee);margin-bottom:8px;font-size:13px;">📧 ${c.email}</div>`:''}
+      ${c.telefone?`<div style="color:var(--text,#c8d8ee);margin-bottom:8px;font-size:13px;">📞 ${c.telefone}</div>`:''}
+      ${c.endereco?`<div style="color:var(--text,#c8d8ee);margin-bottom:8px;font-size:13px;">📍 ${c.endereco}</div>`:''}
+      ${c.empresa?`<div style="color:var(--text,#c8d8ee);margin-bottom:8px;font-size:13px;">🏢 ${c.empresa}</div>`:''}
+      ${(c.observacoes||c.notes)?`<div style="color:var(--text-muted,#4d6a87);font-size:12px;margin-top:12px;border-top:1px solid var(--border,#162030);padding-top:10px;">${c.observacoes||c.notes}</div>`:''}
+    </div>
+    <div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;padding:20px;">
+      <div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px;">Activity</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+        ${_card('Estimates',orcs.length)}${_card('Work Orders',ords.length)}${_card('Invoices',invs.length)}
+      </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border,#162030);display:flex;justify-content:space-between;">
+        <span style="color:var(--text-muted,#4d6a87);font-size:12px;">Total Invoiced</span>
+        <span style="color:var(--primary,#0066ff);font-weight:700;">${typeof fmtCurr==='function'?fmtCurr(invs.reduce((s,i)=>s+parseFloat(i.total||0),0)):''}</span>
+      </div>
+    </div>
+  </div>
+  ${orcs.length?`<div style="margin-bottom:18px;">
+    <div style="color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Estimates / Quotes</div>
+    ${orcs.map(o=>`<div onclick="fecharModal&&fecharModal();openOrcDetail(${o.id})" style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:8px;padding:12px 18px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:border-color .2s;" onmouseover="this.style.borderColor='var(--primary,#0066ff)'" onmouseout="this.style.borderColor='var(--border,#162030)'">
+      <div><span style="color:var(--text,#c8d8ee);font-weight:600;">EST-${String(o.numero||o.id).padStart(4,'0')}</span><span style="color:var(--text-muted,#4d6a87);font-size:12px;margin-left:10px;">${typeof fmtDate==='function'?fmtDate(o.dataOrcamento||o.data):''}</span>${o.ofscricao?`<span style="color:var(--text-muted,#4d6a87);font-size:12px;margin-left:8px;">· ${o.ofscricao.slice(0,40)}</span>`:''}</div>
+      <div style="display:flex;gap:10px;align-items:center;"><span style="color:var(--primary,#0066ff);font-weight:700;">${typeof fmtCurr==='function'?fmtCurr(typeof orcTotal==='function'?orcTotal(o):0):''}</span>${_stBadge(o.status)}</div>
+    </div>`).join('')}
+  </div>`:''}
+  ${ords.length?`<div style="margin-bottom:18px;">
+    <div style="color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Work Orders</div>
+    ${ords.map(o=>`<div onclick="openOSDetail(${o.id})" style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:8px;padding:12px 18px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:border-color .2s;" onmouseover="this.style.borderColor='var(--primary,#0066ff)'" onmouseout="this.style.borderColor='var(--border,#162030)'">
+      <div><span style="color:var(--text,#c8d8ee);font-weight:600;">WO-${String(o.numero||o.id).padStart(4,'0')}</span><span style="color:var(--text-muted,#4d6a87);font-size:12px;margin-left:10px;">${typeof fmtDate==='function'?fmtDate(o.dataAgendada||o.data):''}</span>${o.servico?`<span style="color:var(--text-muted,#4d6a87);font-size:12px;margin-left:8px;">· ${o.servico.slice(0,40)}</span>`:''}</div>
+      ${_stBadge(o.status||'Pending')}
+    </div>`).join('')}
+  </div>`:''}
+  ${invs.length?`<div style="margin-bottom:18px;">
+    <div style="color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Invoices</div>
+    ${invs.map(inv=>`<div onclick="openInvDetail(${inv.id})" style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:8px;padding:12px 18px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:border-color .2s;" onmouseover="this.style.borderColor='var(--primary,#0066ff)'" onmouseout="this.style.borderColor='var(--border,#162030)'">
+      <div><span style="color:var(--text,#c8d8ee);font-weight:600;">INV-${String(inv.numero||inv.id).padStart(4,'0')}</span><span style="color:var(--text-muted,#4d6a87);font-size:12px;margin-left:10px;">${typeof fmtDate==='function'?fmtDate(inv.dataEmissao||inv.data):''}</span></div>
+      <div style="display:flex;gap:10px;align-items:center;"><span style="color:var(--primary,#0066ff);font-weight:700;">${typeof fmtCurr==='function'?fmtCurr(inv.total||0):''}</span>${_stBadge(inv.status)}</div>
+    </div>`).join('')}
+  </div>`:''}
+</div>`;
+    document.getElementById('_cdov').style.display='block';
+  };
+  // Override existing goToCliente & verHistoricoCliente → full-screen
+  window.goToCliente = window.openClientDetail;
+  window.verHistoricoCliente = window.openClientDetail;
+
+  // ── 2. ESTIMATE FULL-SCREEN DETAIL ───────────────────
+  window.openOrcDetail = function(id) {
+    const o=db.orcamentos.find(x=>x.id==id); if(!o) return;
+    const c=db.clientes.find(x=>x.id==o.clienteId)||{};
+    const total=typeof orcTotal==='function'?orcTotal(o):0;
+    const disc=parseFloat(o.ofsconto||0);
+    const dp=parseFloat(o.downPayment||0);
+    const items=(o.items||[]);
+    const ov=_overlay('_odov');
+    ov.innerHTML=`
+<div style="max-width:900px;margin:0 auto;padding:28px 20px;">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;flex-wrap:wrap;">
+    ${_backBtn('← Back')}
+    <h1 style="color:var(--text,#c8d8ee);font-size:20px;font-weight:700;margin:0;">EST-${String(o.numero||o.id).padStart(4,'0')}</h1>
+    ${_stBadge(o.status)}
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <button onclick="document.getElementById('_odov').style.display='none';abrirModalOrc_orig(${o.id})" style="background:transparent;border:1px solid var(--border,#162030);color:var(--text,#c8d8ee);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;">✏️ Edit</button>
+      <button onclick="imprimirOrc(${o.id})" style="background:var(--primary,#0066ff);color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;">🖨️ Print</button>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+    <div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;padding:18px;">
+      <div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">Client</div>
+      <div onclick="openClientDetail(${c.id||0})" style="cursor:pointer;color:var(--primary,#0066ff);font-size:15px;font-weight:700;margin-bottom:6px;">${c.nome||c.name||'—'}</div>
+      ${c.email?`<div style="color:var(--text-muted,#4d6a87);font-size:12px;">📧 ${c.email}</div>`:''}
+      ${c.telefone?`<div style="color:var(--text-muted,#4d6a87);font-size:12px;">📞 ${c.telefone}</div>`:''}
+      ${c.endereco?`<div style="color:var(--text-muted,#4d6a87);font-size:12px;">📍 ${c.endereco}</div>`:''}
+    </div>
+    <div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;padding:18px;">
+      <div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">Details</div>
+      ${_row('Date',typeof fmtDate==='function'?fmtDate(o.dataOrcamento||o.data):'')}
+      ${_row('Valid Until',typeof fmtDate==='function'?fmtDate(o.validaof||''):'')}
+      ${_row('Payment Terms',o.condpagto||'—')}
+      ${o.ofscricao?_row('Description',o.ofscricao):''}
+    </div>
+  </div>
+  ${items.length?`<div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;margin-bottom:16px;overflow:hidden;">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border,#162030);"><div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;">Items & Pricing</div></div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="background:var(--bg,#070f1c);">
+        <th style="padding:10px 18px;text-align:left;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;text-transform:uppercase;">Description</th>
+        <th style="padding:10px 18px;text-align:right;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;">Qty</th>
+        <th style="padding:10px 18px;text-align:right;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;">Unit Price</th>
+        <th style="padding:10px 18px;text-align:right;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;">Total</th>
+      </tr></thead>
+      <tbody>${items.map((it,i)=>{const u=parseFloat(it.valorUnit||0),q=parseFloat(it.qtde||1);return `<tr style="border-bottom:1px solid var(--border,#162030);background:${i%2?'var(--bg-card,#0b1525)':'transparent'}"><td style="padding:11px 18px;color:var(--text,#c8d8ee);font-size:13px;">${it.descricao||''}</td><td style="padding:11px 18px;text-align:right;color:var(--text-muted,#4d6a87);">${q}</td><td style="padding:11px 18px;text-align:right;color:var(--text-muted,#4d6a87);">${typeof fmtCurr==='function'?fmtCurr(u):u}</td><td style="padding:11px 18px;text-align:right;color:var(--text,#c8d8ee);font-weight:600;">${typeof fmtCurr==='function'?fmtCurr(u*q):u*q}</td></tr>`}).join('')}</tbody>
+    </table>
+    <div style="padding:14px 18px;display:flex;justify-content:flex-end;"><div style="width:280px;">
+      ${disc>0?_row('Subtotal',typeof fmtCurr==='function'?fmtCurr(total+disc):''):''}
+      ${disc>0?_row('Discount','- '+(typeof fmtCurr==='function'?fmtCurr(disc):'')):''}
+      ${dp>0?_row('Down Payment',typeof fmtCurr==='function'?fmtCurr(dp):''):''}
+      <div style="background:var(--primary,#0066ff);color:#fff;border-radius:8px;padding:12px 16px;margin-top:8px;display:flex;justify-content:space-between;font-weight:700;font-size:15px;"><span>Total</span><span>${typeof fmtCurr==='function'?fmtCurr(total):total}</span></div>
+      ${dp>0?`<div style="display:flex;justify-content:space-between;padding:8px 2px;color:var(--text-muted,#4d6a87);font-size:12px;"><span>Balance Due</span><span style="font-weight:600;color:var(--text,#c8d8ee);">${typeof fmtCurr==='function'?fmtCurr(total-dp):''}</span></div>`:''}
+    </div></div>
+  </div>`:''}
+  ${o.observacoes?`<div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;padding:16px 18px;"><div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Notes</div><div style="color:var(--text,#c8d8ee);font-size:13px;line-height:1.6;">${o.observacoes}</div></div>`:''}
+</div>`;
+    document.getElementById('_odov').style.display='block';
+  };
+
+  // ── 3. WORK ORDER FULL-SCREEN DETAIL ─────────────────
+  window.openOSDetail = function(id) {
+    const o=db.ordens.find(x=>x.id==id); if(!o) return;
+    const c=db.clientes.find(x=>x.id==o.clienteId)||{};
+    const ov=_overlay('_wdov');
+    ov.innerHTML=`
+<div style="max-width:900px;margin:0 auto;padding:28px 20px;">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;flex-wrap:wrap;">
+    ${_backBtn('← Back')}
+    <h1 style="color:var(--text,#c8d8ee);font-size:20px;font-weight:700;margin:0;">WO-${String(o.numero||o.id).padStart(4,'0')}</h1>
+    ${_stBadge(o.status||'Pending')}
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <button onclick="document.getElementById('_wdov').style.display='none';abrirModalOrdem_orig(${o.id})" style="background:transparent;border:1px solid var(--border,#162030);color:var(--text,#c8d8ee);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;">✏️ Edit</button>
+      <button onclick="imprimirOS(${o.id})" style="background:var(--primary,#0066ff);color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;">🖨️ Print</button>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+    <div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;padding:18px;">
+      <div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">Client</div>
+      <div onclick="openClientDetail(${c.id||0})" style="cursor:pointer;color:var(--primary,#0066ff);font-size:15px;font-weight:700;margin-bottom:6px;">${c.nome||c.name||'—'}</div>
+      ${c.email?`<div style="color:var(--text-muted,#4d6a87);font-size:12px;">📧 ${c.email}</div>`:''}
+      ${c.telefone?`<div style="color:var(--text-muted,#4d6a87);font-size:12px;">📞 ${c.telefone}</div>`:''}
+      ${c.endereco?`<div style="color:var(--text-muted,#4d6a87);font-size:12px;">📍 ${c.endereco}</div>`:''}
+    </div>
+    <div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;padding:18px;">
+      <div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">Details</div>
+      ${_row('Scheduled',typeof fmtDate==='function'?fmtDate(o.dataAgendada||''):''+(o.horaAgendada?' '+o.horaAgendada:''))}
+      ${_row('Technician',o.tecnico||'—')}
+      ${o.servico?_row('Service',o.servico):''}
+    </div>
+  </div>
+  ${(o.notas||o.observacoes)?`<div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;padding:16px 18px;margin-bottom:16px;"><div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Notes</div><div style="color:var(--text,#c8d8ee);font-size:13px;line-height:1.6;">${o.notas||o.observacoes}</div></div>`:''}
+  ${(o.itens&&o.itens.length)?`<div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;overflow:hidden;">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border,#162030);"><div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;">Items</div></div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="background:var(--bg,#070f1c);"><th style="padding:10px 18px;text-align:left;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;">Description</th><th style="padding:10px 18px;text-align:right;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;">Qty</th><th style="padding:10px 18px;text-align:right;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;">Price</th><th style="padding:10px 18px;text-align:right;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;">Total</th></tr></thead>
+      <tbody>${(o.itens||[]).map((it,i)=>{const u=parseFloat(it.valorUnit||0),q=parseFloat(it.qtde||1);return `<tr style="border-bottom:1px solid var(--border,#162030);background:${i%2?'var(--bg-card,#0b1525)':'transparent'}"><td style="padding:11px 18px;color:var(--text,#c8d8ee);">${it.descricao||''}</td><td style="padding:11px 18px;text-align:right;color:var(--text-muted,#4d6a87);">${q}</td><td style="padding:11px 18px;text-align:right;color:var(--text-muted,#4d6a87);">${typeof fmtCurr==='function'?fmtCurr(u):u}</td><td style="padding:11px 18px;text-align:right;color:var(--text,#c8d8ee);font-weight:600;">${typeof fmtCurr==='function'?fmtCurr(u*q):u*q}</td></tr>`}).join('')}</tbody>
+    </table>
+  </div>`:''}
+</div>`;
+    document.getElementById('_wdov').style.display='block';
+  };
+
+  // ── 4. INVOICE FULL-SCREEN DETAIL ────────────────────
+  window.openInvDetail = function(id) {
+    const inv=db.invoices.find(x=>x.id==id); if(!inv) return;
+    const c=db.clientes.find(x=>x.id==inv.clienteId)||{};
+    const items=inv.items||inv.itens||[];
+    const subtotal=parseFloat(inv.subtotal||inv.total||0);
+    const tax=parseFloat(inv.tax||inv.imposto||0);
+    const disc=parseFloat(inv.ofsconto||inv.discount||inv.desconto||0);
+    const total=parseFloat(inv.total||subtotal+tax-disc||0);
+    const ov=_overlay('_idov');
+    ov.innerHTML=`
+<div style="max-width:900px;margin:0 auto;padding:28px 20px;">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;flex-wrap:wrap;">
+    ${_backBtn('← Back')}
+    <h1 style="color:var(--text,#c8d8ee);font-size:20px;font-weight:700;margin:0;">INV-${String(inv.numero||inv.id).padStart(4,'0')}</h1>
+    ${_stBadge(inv.status)}
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <button onclick="document.getElementById('_idov').style.display='none';abrirModalInvoice_orig(${inv.id})" style="background:transparent;border:1px solid var(--border,#162030);color:var(--text,#c8d8ee);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;">✏️ Edit</button>
+      <button onclick="imprimirInvoice(${inv.id})" style="background:var(--primary,#0066ff);color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;">🖨️ Print</button>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+    <div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;padding:18px;">
+      <div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">Bill To</div>
+      <div onclick="openClientDetail(${c.id||0})" style="cursor:pointer;color:var(--primary,#0066ff);font-size:15px;font-weight:700;margin-bottom:6px;">${c.nome||c.name||'—'}</div>
+      ${c.email?`<div style="color:var(--text-muted,#4d6a87);font-size:12px;">📧 ${c.email}</div>`:''}
+      ${c.telefone?`<div style="color:var(--text-muted,#4d6a87);font-size:12px;">📞 ${c.telefone}</div>`:''}
+    </div>
+    <div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;padding:18px;">
+      <div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">Details</div>
+      ${_row('Issue Date',typeof fmtDate==='function'?fmtDate(inv.dataEmissao||inv.data||''):'')}
+      ${_row('Due Date',typeof fmtDate==='function'?fmtDate(inv.dataVenc||inv.dueDate||''):'On Receipt')}
+      ${_row('Payment Terms',inv.paymentTerms||inv.condpagto||'—')}
+    </div>
+  </div>
+  ${items.length?`<div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;margin-bottom:16px;overflow:hidden;">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border,#162030);"><div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;">Items</div></div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="background:var(--bg,#070f1c);"><th style="padding:10px 18px;text-align:left;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;">Description</th><th style="padding:10px 18px;text-align:right;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;">Qty</th><th style="padding:10px 18px;text-align:right;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;">Unit Price</th><th style="padding:10px 18px;text-align:right;color:var(--text-muted,#4d6a87);font-size:11px;font-weight:700;">Amount</th></tr></thead>
+      <tbody>${items.map((it,i)=>{const u=parseFloat(it.valorUnit||it.price||0),q=parseFloat(it.qtde||it.qty||1);return `<tr style="border-bottom:1px solid var(--border,#162030);background:${i%2?'var(--bg-card,#0b1525)':'transparent'}"><td style="padding:11px 18px;color:var(--text,#c8d8ee);">${it.descricao||it.description||''}</td><td style="padding:11px 18px;text-align:right;color:var(--text-muted,#4d6a87);">${q}</td><td style="padding:11px 18px;text-align:right;color:var(--text-muted,#4d6a87);">${typeof fmtCurr==='function'?fmtCurr(u):u}</td><td style="padding:11px 18px;text-align:right;color:var(--text,#c8d8ee);font-weight:600;">${typeof fmtCurr==='function'?fmtCurr(u*q):u*q}</td></tr>`}).join('')}</tbody>
+    </table>
+    <div style="padding:14px 18px;display:flex;justify-content:flex-end;"><div style="width:280px;">
+      ${disc>0?_row('Subtotal',typeof fmtCurr==='function'?fmtCurr(subtotal):''):''}
+      ${disc>0?_row('Discount','- '+(typeof fmtCurr==='function'?fmtCurr(disc):'')):''}
+      ${tax>0?_row('Tax',typeof fmtCurr==='function'?fmtCurr(tax):''):''}
+      <div style="background:var(--primary,#0066ff);color:#fff;border-radius:8px;padding:12px 16px;margin-top:8px;display:flex;justify-content:space-between;font-weight:700;font-size:15px;"><span>Total Due</span><span>${typeof fmtCurr==='function'?fmtCurr(total):total}</span></div>
+    </div></div>
+  </div>`:''}
+  ${inv.notas?`<div style="background:var(--bg-card,#0b1525);border:1px solid var(--border,#162030);border-radius:12px;padding:16px 18px;"><div style="color:var(--primary,#0066ff);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Notes</div><div style="color:var(--text,#c8d8ee);font-size:13px;line-height:1.6;">${inv.notas}</div></div>`:''}
+</div>`;
+    document.getElementById('_idov').style.display='block';
+  };
+
+  // ── 5. INTERCEPT RECORD CLICKS → full-screen ─────────
+  // Save originals
+  if(window.abrirModalOrc) window.abrirModalOrc_orig=window.abrirModalOrc;
+  if(window.abrirModalOrdem) window.abrirModalOrdem_orig=window.abrirModalOrdem;
+  if(window.abrirModalInvoice) window.abrirModalInvoice_orig=window.abrirModalInvoice;
+
+  // When clicking a record ID (strong tag with onclick abrirModalOrc) → open detail view
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('strong[onclick*="abrirModalOrc("]');
+    if(btn) {
+      const m = btn.getAttribute('onclick').match(/abrirModalOrc\((\d+)\)/);
+      if(m && parseInt(m[1])>0){ e.preventDefault(); e.stopPropagation(); openOrcDetail(parseInt(m[1])); }
+    }
+    const wbtn = e.target.closest('strong[onclick*="abrirModalOrdem("]');
+    if(wbtn) {
+      const m = wbtn.getAttribute('onclick').match(/abrirModalOrdem\((\d+)\)/);
+      if(m && parseInt(m[1])>0){ e.preventDefault(); e.stopPropagation(); openOSDetail(parseInt(m[1])); }
+    }
+    const ibtn = e.target.closest('strong[onclick*="abrirModalInvoice("]');
+    if(ibtn) {
+      const m = ibtn.getAttribute('onclick').match(/abrirModalInvoice\((\d+)\)/);
+      if(m && parseInt(m[1])>0){ e.preventDefault(); e.stopPropagation(); openInvDetail(parseInt(m[1])); }
+    }
+  }, true);
+
+  // ── 6. DOWN PAYMENT + DISCOUNT TYPE IN FORMS ─────────
+  const _patched = new WeakSet();
+  function _patchOrcForm(modal) {
+    if(_patched.has(modal)) return; _patched.add(modal);
+    const discEl = modal.querySelector('#f-ofsconto'); if(!discEl) return;
+    const grp = discEl.closest('.form-group'); if(!grp) return;
+    const lbl = grp.querySelector('label'); if(!lbl) return;
+    // Add type select next to label
+    lbl.innerHTML = 'Discount <select id="f-discType" style="margin-left:6px;padding:2px 8px;border-radius:4px;border:1px solid var(--border,#162030);background:var(--bg-input,#081220);color:var(--text,#c8d8ee);font-size:12px;" onchange="calcTotal&&calcTotal()"><option value="$">$ Fixed</option><option value="%">% Percent</option></select>';
+    // Insert Down Payment field after discount group
+    if(!modal.querySelector('#f-downPayment')) {
+      const dp=document.createElement('div');
+      dp.className='form-group';
+      dp.innerHTML='<label>Down Payment ($)</label><input type="number" id="f-downPayment" value="0" min="0" step="0.01" oninput="calcTotal&&calcTotal()">';
+      grp.insertAdjacentElement('afterend', dp);
+    }
+    // Restore values if editing existing record
+    const saveBtn = modal.querySelector('[onclick*="salvarOrc("]');
+    if(saveBtn) {
+      const m = saveBtn.getAttribute('onclick').match(/salvarOrc\((\d+)\)/);
+      const oId = m ? parseInt(m[1]) : 0;
+      if(oId > 0) {
+        const rec = db.orcamentos.find(x=>x.id==oId);
+        if(rec) {
+          const dp=modal.querySelector('#f-downPayment'); if(dp) dp.value=rec.downPayment||0;
+          const dt=modal.querySelector('#f-discType'); if(dt) dt.value=rec.discountType||'$';
+        }
+      }
+    }
+  }
+  function _patchInvForm(modal) {
+    if(_patched.has(modal)) return; _patched.add(modal);
+    const discEl = modal.querySelector('#f-ofsconto'); if(!discEl) return;
+    const grp = discEl.closest('.form-group'); if(!grp) return;
+    const lbl = grp.querySelector('label'); if(!lbl) return;
+    lbl.innerHTML = 'Discount <select id="f-discType" style="margin-left:6px;padding:2px 8px;border-radius:4px;border:1px solid var(--border,#162030);background:var(--bg-input,#081220);color:var(--text,#c8d8ee);font-size:12px;" onchange="calcTotal&&calcTotal()"><option value="$">$ Fixed</option><option value="%">% Percent</option></select>';
+    const saveBtn = modal.querySelector('[onclick*="salvarInvoice("]');
+    if(saveBtn) {
+      const m = saveBtn.getAttribute('onclick').match(/salvarInvoice\((\d+)\)/);
+      const iId = m ? parseInt(m[1]) : 0;
+      if(iId > 0) {
+        const rec = db.invoices.find(x=>x.id==iId);
+        if(rec) { const dt=modal.querySelector('#f-discType'); if(dt) dt.value=rec.discountType||'$'; }
+      }
+    }
+  }
+  new MutationObserver(function(muts) {
+    muts.forEach(function(m) {
+      m.addedNodes.forEach(function(node) {
+        if(node.nodeType!==1) return;
+        const modal = node.id==='modal-overlay'?node:node.querySelector?.('#modal-overlay, .modal-overlay');
+        const target = modal||node;
+        if(target.querySelector?.('#f-ofsconto')) {
+          if(target.querySelector?.('[onclick*="salvarOrc("]')) _patchOrcForm(target);
+          else if(target.querySelector?.('[onclick*="salvarInvoice("]')) _patchInvForm(target);
+        }
+      });
+    });
+  }).observe(document.body, {childList:true, subtree:true});
+
+  // ── 7. PATCH salvarOrc to save down payment + disc type
+  const _origSalvarOrc = window.salvarOrc;
+  if(_origSalvarOrc) {
+    window.salvarOrc = function(id) {
+      const dpEl=document.getElementById('f-downPayment');
+      const dtEl=document.getElementById('f-discType');
+      const discEl=document.getElementById('f-ofsconto');
+      _origSalvarOrc(id);
+      const arr=db.orcamentos; if(!arr.length) return;
+      const rec=id?arr.find(x=>x.id==id):arr[arr.length-1];
+      if(rec) {
+        if(dpEl) rec.downPayment=parseFloat(dpEl.value||0);
+        if(dtEl) {
+          rec.discountType=dtEl.value;
+          if(dtEl.value==='%' && discEl) {
+            const pct=parseFloat(discEl.value||0);
+            const sub=(rec.items||[]).reduce((s,i)=>s+(parseFloat(i.valorUnit||0))*(parseFloat(i.qtde||1)),0);
+            rec.ofsconto=parseFloat((sub*pct/100).toFixed(2));
+          }
+        }
+        if(typeof saveDB==='function') saveDB(); else if(typeof salvar==='function') salvar();
+      }
+    };
+  }
+  // PATCH salvarInvoice to save disc type
+  const _origSalvarInv = window.salvarInvoice;
+  if(_origSalvarInv) {
+    window.salvarInvoice = function(id) {
+      const dtEl=document.getElementById('f-discType');
+      const discEl=document.getElementById('f-ofsconto');
+      _origSalvarInv(id);
+      const arr=db.invoices; if(!arr.length) return;
+      const rec=id?arr.find(x=>x.id==id):arr[arr.length-1];
+      if(rec && dtEl) {
+        rec.discountType=dtEl.value;
+        if(dtEl.value==='%' && discEl) {
+          const pct=parseFloat(discEl.value||0);
+          const sub=(rec.items||rec.itens||[]).reduce((s,i)=>s+(parseFloat(i.preco||i.valorUnit||0))*(parseFloat(i.qty||i.qtde||1)),0);
+          const discAmt=parseFloat((sub*pct/100).toFixed(2));
+          rec.ofsconto=discAmt; rec.discount=discAmt; rec.desconto=discAmt;
+          rec.total=sub+parseFloat(rec.tax||0)-discAmt;
+        }
+        if(typeof saveDB==='function') saveDB(); else if(typeof salvar==='function') salvar();
+      }
+    };
+  }
+
+  // ── 8. BACKUP & RESTORE ──────────────────────────────
+  window.downloadBackup = function() {
+    try {
+      const snap=JSON.stringify({ts:new Date().toISOString(),version:2,db:db},null,2);
+      const blob=new Blob([snap],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download='alumicraft-backup-'+new Date().toISOString().slice(0,10)+'.json';
+      a.click(); URL.revokeObjectURL(url);
+      if(typeof toast==='function') toast('Backup downloaded!','success');
+    } catch(e){ alert('Backup error: '+e.message); }
+  };
+  window.restoreFromFile = function(input) {
+    const file=input.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=function(e){
+      try {
+        const data=JSON.parse(e.target.result);
+        const restored=data.db||data;
+        if(!restored.clientes) throw new Error('Invalid backup format');
+        Object.assign(db,restored);
+        if(typeof saveDB==='function') saveDB(); else if(typeof salvar==='function') salvar();
+        ['renderClientes','renderOrcamentos','renderOrdens','renderInvoices'].forEach(fn=>{ if(typeof window[fn]==='function') window[fn](); });
+        if(typeof toast==='function') toast('Restored from '+(data.ts?new Date(data.ts).toLocaleDateString():'file')+'!','success');
+        else alert('Restored successfully!');
+      } catch(err){ alert('❌ Invalid backup file: '+err.message); }
+    };
+    reader.readAsText(file);
+  };
+  // Auto-save to localStorage every hour
+  function _autoBackup() {
+    try {
+      localStorage.setItem('_acp_bk',JSON.stringify({ts:new Date().toISOString(),db:db}));
+      localStorage.setItem('_acp_bk_ts',new Date().toISOString());
+    } catch(e){}
+  }
+  setInterval(_autoBackup, 3600000);
+  setTimeout(_autoBackup, 8000);
+
+  // Inject backup UI into Settings section when it's shown
+  function _injectBackupUI() {
+    if(document.getElementById('_bk_ui')) return;
+    const content=document.getElementById('content');
+    if(!content||!content.innerHTML.includes('Settings')) return;
+    const div=document.createElement('div');
+    div.id='_bk_ui';
+    div.style.cssText='margin-top:22px;';
+    div.innerHTML=`<div class="panel"><div class="panel-header"><h2>💾 Backup & Restore</h2></div><div style="padding:18px 22px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="downloadBackup()">⬇️ Download Backup</button>
+      <label class="btn btn-gray" style="cursor:pointer;">⬆️ Restore from File<input type="file" accept=".json" onchange="restoreFromFile(this)" style="display:none;"></label>
+      <span id="_bk_ts" style="font-size:12px;color:var(--text-muted);">${localStorage.getItem('_acp_bk_ts')?'Last auto-backup: '+new Date(localStorage.getItem('_acp_bk_ts')).toLocaleString():''}</span>
+    </div></div>`;
+    content.appendChild(div);
+  }
+  // Hook into section changes (try common patterns)
+  ['showSection','mostrarSecao','navegar','navigate'].forEach(fn=>{
+    if(typeof window[fn]==='function'){
+      const orig=window[fn];
+      window[fn]=function(s){
+        orig.apply(this,arguments);
+        if(s==='settings'||s==='configuracoes'||s==='config') setTimeout(_injectBackupUI,150);
+      };
+    }
+  });
+  // Also try clicking nav links
+  document.addEventListener('click', function(e) {
+    const link=e.target.closest('a[href="#settings"],a[href="#config"],[data-section="settings"],[onclick*="settings"],[onclick*="Settings"],[onclick*="configuracoes"]');
+    if(link) setTimeout(_injectBackupUI,300);
+  });
+
+  console.log('[AluminumPro] Feature patch loaded: backup, client-detail, full-screen-views, down-payment, discount-type');
+})();
+
 </script>
 </body>
 </html>
