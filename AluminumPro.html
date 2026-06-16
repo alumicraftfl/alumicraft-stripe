@@ -3894,6 +3894,227 @@ carregar();
   console.log('[AluminumPro] Down payment $/% patch loaded');
 })();
 
+
+(function() {
+  'use strict';
+
+  // ── 1. ROBUST calcTotal ────────────────────────────────────────────────────
+  // Override with bulletproof version + fix text-decoration typo + stronger total display
+  var _origCalcTotal = window.calcTotal;
+  window.calcTotal = function() {
+    var c = document.getElementById('itens-container');
+    if (!c) return;
+    var t = 0;
+    c.querySelectorAll('.item-row').forEach(function(row) {
+      var qEl = row.querySelector('.item-qty');
+      var pEl = row.querySelector('.item-preco');
+      var q = parseFloat((qEl && qEl.value) || '0') || 0;
+      var p = parseFloat((pEl && pEl.value) || '0') || 0;
+      var s = Math.round(q * p * 100) / 100;
+      t += s;
+      var se = row.querySelector('.item-sub');
+      if (se) { se.value = fmt(s); se.style.color = s > 0 ? 'var(--primary,#0066ff)' : ''; se.style.fontWeight = s > 0 ? '700' : ''; }
+    });
+    t = Math.round(t * 100) / 100;
+    var discEl = document.getElementById('f-ofsconto');
+    var d = parseFloat((discEl && discEl.value) || '0') || 0;
+    var net = Math.round((t - d) * 100) / 100;
+    var tl = document.getElementById('total-label');
+    if (tl) {
+      if (d > 0) {
+        tl.innerHTML = 'Subtotal: <span style="text-decoration:line-through;color:var(--text-muted,#4d6a87)">' + fmt(t) + '</span>&nbsp;&nbsp;Discount: -' + fmt(d) + '&nbsp;&nbsp;<strong style="color:var(--primary,#0066ff);font-size:1.1em">Total: ' + fmt(net) + '</strong>';
+      } else {
+        tl.innerHTML = '<strong style="color:var(--primary,#0066ff);font-size:1.1em">Total: ' + fmt(t) + '</strong>';
+      }
+    }
+  };
+
+  // ── 2. WO ITEMS calcTotal (separate container) ─────────────────────────────
+  window.calcTotalWO = function() {
+    var c = document.getElementById('wo-itens-container');
+    if (!c) return;
+    var t = 0;
+    c.querySelectorAll('.item-row').forEach(function(row) {
+      var qEl = row.querySelector('.item-qty');
+      var pEl = row.querySelector('.item-preco');
+      var q = parseFloat((qEl && qEl.value) || '0') || 0;
+      var p = parseFloat((pEl && pEl.value) || '0') || 0;
+      var s = Math.round(q * p * 100) / 100;
+      t += s;
+      var se = row.querySelector('.item-sub');
+      if (se) { se.value = fmt(s); se.style.color = s > 0 ? 'var(--primary,#0066ff)' : ''; se.style.fontWeight = s > 0 ? '700' : ''; }
+    });
+    var tl = document.getElementById('wo-total-label');
+    if (tl) tl.innerHTML = '<strong style="color:var(--primary,#0066ff);font-size:1.1em">Total: ' + fmt(t) + '</strong>';
+  };
+
+  // ── 3. Shared itemRow HTML builder for all forms ───────────────────────────
+  window._buildItemRowHtml = function(it, i, calcFn) {
+    var sub = Math.round((parseFloat(it.qty || 1) * parseFloat(it.preco || 0)) * 100) / 100;
+    var fmtSub = fmt(sub);
+    var color = sub > 0 ? 'color:var(--primary,#0066ff);font-weight:700;' : '';
+    return '<div class="item-row" id="item-row-' + i + '">' +
+      '<div style="display:grid;grid-template-columns:auto 1fr;gap:4px">' +
+        '<select class="item-tipo" onchange="' + calcFn + '">' +
+          ['gutter','soffit','pool_cage','carport','railing','outro'].map(function(v) {
+            return '<option value="' + v + '"' + (it.tipo === v ? ' selected' : '') + '>' + (typeof servicoLabel === 'function' ? servicoLabel(v) : v) + '</option>';
+          }).join('') +
+        '</select>' +
+        '<input placeholder="Description" value="' + (it.ofsc || it.descricao || '').replace(/"/g,'&quot;') + '" class="item-ofsc" oninput="' + calcFn + '" onchange="' + calcFn + '">' +
+      '</div>' +
+      '<input type="number" placeholder="Qty" value="' + (it.qty || 1) + '" min="0" step="0.01" class="item-qty" oninput="' + calcFn + '" onchange="' + calcFn + '">' +
+      '<input type="number" placeholder="$ Unit" value="' + (it.preco || 0) + '" min="0" step="0.01" class="item-preco" oninput="' + calcFn + '" onchange="' + calcFn + '">' +
+      '<input readonly value="' + fmtSub + '" style="background:var(--bg-card,#0b1525);border:1.5px solid var(--primary,#0066ff);border-radius:6px;font-weight:700;' + color + '" class="item-sub" id="sub-' + i + '">' +
+      '<button class="remove-btn" onclick="' + (calcFn === 'calcTotal()' ? 'removeItemRow' : 'removeWOItemRow') + '(' + i + ')">✕</button>' +
+    '</div>';
+  };
+
+  // ── 4. HOOK INPUTS via addEventListener (fallback to catch all cases) ───────
+  function _hookContainerInputs(container, calcFn) {
+    container.querySelectorAll('.item-qty, .item-preco').forEach(function(input) {
+      if (input._calcHooked) return;
+      input._calcHooked = true;
+      input.addEventListener('input', calcFn);
+      input.addEventListener('change', calcFn);
+    });
+  }
+
+  // MutationObserver: when itens-container or wo-itens-container appears, hook inputs + calc
+  new MutationObserver(function(muts) {
+    muts.forEach(function(m) {
+      m.addedNodes.forEach(function(node) {
+        if (node.nodeType !== 1) return;
+        var orc = node.id === 'itens-container' ? node : (node.querySelector && node.querySelector('#itens-container'));
+        var wo  = node.id === 'wo-itens-container' ? node : (node.querySelector && node.querySelector('#wo-itens-container'));
+        if (orc) { _hookContainerInputs(orc, window.calcTotal); setTimeout(window.calcTotal, 50); }
+        if (wo)  { _hookContainerInputs(wo, window.calcTotalWO); setTimeout(window.calcTotalWO, 50); }
+      });
+    });
+  }).observe(document.body, {childList: true, subtree: true});
+
+  // ── 5. PATCH addItemRow to hook new rows ───────────────────────────────────
+  if (typeof window.addItemRow === 'function') {
+    var _origAddItemRow = window.addItemRow;
+    window.addItemRow = function() {
+      _origAddItemRow.apply(this, arguments);
+      var c = document.getElementById('itens-container');
+      if (c) { _hookContainerInputs(c, window.calcTotal); setTimeout(window.calcTotal, 20); }
+    };
+  }
+  window.addWOItemRow = function() {
+    var c = document.getElementById('wo-itens-container');
+    if (!c) return;
+    var i = c.querySelectorAll('.item-row').length;
+    c.insertAdjacentHTML('beforeend', window._buildItemRowHtml({tipo:'gutter',ofsc:'',qty:1,preco:0}, i, 'calcTotalWO()'));
+    _hookContainerInputs(c, window.calcTotalWO);
+    window.calcTotalWO();
+  };
+  window.removeWOItemRow = function(i) {
+    var el = document.getElementById('item-row-' + i);
+    if (el) el.remove();
+    window.calcTotalWO();
+  };
+
+  // ── 6. PATCH abrirModalOrdem to include line items ─────────────────────────
+  if (typeof window.abrirModalOrdem === 'function') {
+    var _origAbrirModalOrdem = window.abrirModalOrdem;
+    window.abrirModalOrdem = function(id) {
+      _origAbrirModalOrdem.apply(this, arguments);
+      setTimeout(function() {
+        // Find the modal
+        var modal = document.querySelector('#modal-overlay, .modal-overlay');
+        if (!modal) return;
+        if (modal.querySelector('#wo-itens-container')) return; // already patched
+
+        // Get the order record and linked quote items
+        var os = id ? (db && db.ordens && db.ordens.find(function(x){ return x.id == id; })) : null;
+        var itens = (os && os.itens) || [];
+
+        // If linked to a quote and no items saved yet, pull from quote
+        if (!itens.length && os && os.orcId) {
+          var orc = db && db.orcamentos && db.orcamentos.find(function(x){ return x.id == os.orcId; });
+          if (orc && orc.itens && orc.itens.length) itens = orc.itens;
+        }
+        if (!itens.length) itens = [{tipo:'gutter',ofsc:'',qty:1,preco:0}];
+
+        var rowsHtml = itens.map(function(it,i){ return window._buildItemRowHtml(it, i, 'calcTotalWO()'); }).join('');
+        var total = itens.reduce(function(s,it){ return s + (parseFloat(it.qty)||0)*(parseFloat(it.preco)||0); }, 0);
+
+        var section = document.createElement('div');
+        section.id = '_wo_items_section';
+        section.innerHTML =
+          '<div style="margin-top:16px;">' +
+            '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--primary,#0066ff);margin-bottom:8px;">Items / Services</div>' +
+            '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:4px;font-size:11px;color:var(--text-muted,#4d6a87);font-weight:700;padding:0 2px;">' +
+              '<span>Type / Description</span><span>Qty</span><span>Unit $</span><span>Subtotal</span><span></span>' +
+            '</div>' +
+            '<div id="wo-itens-container">' + rowsHtml + '</div>' +
+            '<button class="btn btn-sm btn-outline mt10" onclick="addWOItemRow()" style="margin-top:8px;">+ Item</button>' +
+            '<div id="wo-total-label" style="margin-top:10px;text-align:right;">' +
+              '<strong style="color:var(--primary,#0066ff);font-size:1.1em">Total: ' + fmt(total) + '</strong>' +
+            '</div>' +
+          '</div>';
+
+        // Insert before the modal footer
+        var footer = modal.querySelector('.modal-footer');
+        if (footer) footer.parentNode.insertBefore(section, footer);
+        else modal.appendChild(section);
+
+        // Hook inputs
+        var c = document.getElementById('wo-itens-container');
+        if (c) _hookContainerInputs(c, window.calcTotalWO);
+        setTimeout(window.calcTotalWO, 50);
+      }, 120);
+    };
+  }
+
+  // ── 7. PATCH salvarOrdem to save WO items ─────────────────────────────────
+  if (typeof window.salvarOrdem === 'function') {
+    var _origSalvarOrdem = window.salvarOrdem;
+    window.salvarOrdem = function(id) {
+      _origSalvarOrdem.apply(this, arguments);
+      // Save WO items after save
+      var c = document.getElementById('wo-itens-container');
+      if (!c) return;
+      var items = [];
+      c.querySelectorAll('.item-row').forEach(function(row) {
+        items.push({
+          tipo: (row.querySelector('.item-tipo') && row.querySelector('.item-tipo').value) || 'outro',
+          ofsc: (row.querySelector('.item-ofsc') && row.querySelector('.item-ofsc').value) || '',
+          qty: parseFloat((row.querySelector('.item-qty') && row.querySelector('.item-qty').value) || '0') || 0,
+          preco: parseFloat((row.querySelector('.item-preco') && row.querySelector('.item-preco').value) || '0') || 0
+        });
+      });
+      var arr = db && db.ordens;
+      if (!arr || !arr.length) return;
+      var rec = id ? arr.find(function(x){ return x.id == id; }) : arr[arr.length-1];
+      if (rec) {
+        rec.itens = items;
+        rec.total = items.reduce(function(s,it){ return s+(it.qty||0)*(it.preco||0); }, 0);
+        if (typeof saveDB === 'function') saveDB(); else if (typeof salvar === 'function') salvar();
+      }
+    };
+  }
+
+  // ── 8. Also fix abrirModalOrc to immediately trigger calcTotal ─────────────
+  if (typeof window.abrirModalOrc === 'function') {
+    var _origAbrirOrc = window.abrirModalOrc;
+    window.abrirModalOrc = function(id) {
+      _origAbrirOrc.apply(this, arguments);
+      setTimeout(window.calcTotal, 80);
+    };
+  }
+  if (typeof window.abrirModalInvoice === 'function') {
+    var _origAbrirInv = window.abrirModalInvoice;
+    window.abrirModalInvoice = function(id) {
+      _origAbrirInv.apply(this, arguments);
+      setTimeout(window.calcTotal, 80);
+    };
+  }
+
+  console.log('[AluminumPro] Calc-fix patch loaded: robust calcTotal + WO items + auto-hook');
+})();
+
 </script>
 </body>
 </html>
