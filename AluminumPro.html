@@ -663,6 +663,8 @@ async function syncFromCloud(companyId, fbDb) {
     const ls = await fb.getDoc(lr);
     if(ls.exists()){ cloudData.settings=cloudData.settings||{}; cloudData.settings.logoBase64=ls.data().logo||''; }
     db = cloudData;
+    if(!db.parceiros) db.parceiros=[];
+    if(!db._id.parceiros) db._id.parceiros=1;
     salvarLocal();
     return true;
   } catch(e){ console.error('[Cloud] syncFromCloud:',e); return false; }
@@ -1420,8 +1422,8 @@ async function criarAssinaturaParceiro(id) {
       </div>`;
     if(btn){ btn.disabled=false; btn.textContent='⚡ Generate New Link'; }
   } catch(e) {
-    toast('Stripe error: '+e.message,'error');
-    if(btn){ btn.disabled=false; btn.textContent='⚡ Generate Billing Link'; }
+    toast('GoCardless error: '+e.message,'error');
+    if(btn){ btn.disabled=false; btn.textContent='🏦 Generate Billing Link'; }
   }
 }
 
