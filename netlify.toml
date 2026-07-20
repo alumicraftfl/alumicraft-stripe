@@ -2,3 +2,9 @@
   functions = "netlify/functions"
   command = "npm install"
   publish = "."
+
+[build.environment]
+  # AluminumPro.html embeds the app's public Firebase Web API key (client-side,
+  # not a real secret — Firebase security relies on Firestore rules, not on
+  # hiding this key). Netlify's secrets scanner flags it as a false positive.
+  SECRETS_SCAN_OMIT_PATHS = "AluminumPro.html"
