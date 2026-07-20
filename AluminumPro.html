@@ -90,6 +90,9 @@
   .badge-aberto { background: rgba(255,160,0,0.15); color: #ffc107; border:1px solid rgba(255,160,0,0.3); } .badge-vencido { background: rgba(255,64,64,0.15); color: #ff6060; border:1px solid rgba(255,64,64,0.3); }
   .badge-ok { background: rgba(0,217,126,0.15); color: #00d97e; border:1px solid rgba(0,217,126,0.3); } .badge-baixo { background: rgba(255,64,64,0.15); color: #ff6060; border:1px solid rgba(255,64,64,0.3); }
   .badge-receita { background: rgba(0,217,126,0.15); color: #00d97e; border:1px solid rgba(0,217,126,0.3); } .badge-ofspesa { background: rgba(255,64,64,0.15); color: #ff6060; border:1px solid rgba(255,64,64,0.3); }
+  .badge-plano-bronze { background: rgba(205,127,50,0.18); color: #cd7f32; border:1px solid rgba(205,127,50,0.35); } .badge-plano-silver { background: rgba(192,192,192,0.2); color: #cfd8dc; border:1px solid rgba(192,192,192,0.4); }
+  .badge-plano-gold { background: rgba(201,162,39,0.18); color: #d4af37; border:1px solid rgba(201,162,39,0.35); } .badge-plano-platinum { background: rgba(229,228,226,0.22); color: #e5e4e2; border:1px solid rgba(229,228,226,0.4); }
+  .badge-plano-enterprise { background: rgba(240,105,26,0.15); color: #f0691a; border:1px solid rgba(240,105,26,0.3); }
   .badge-rascunho { background: rgba(77,106,135,0.2); color: #7a9ab5; border:1px solid rgba(77,106,135,0.3); } .badge-enviado { background: rgba(0,180,255,0.15); color: #00b4ff; border:1px solid rgba(0,180,255,0.3); }
 
   /* SEARCH */
@@ -490,6 +493,7 @@
     <a onclick="showPage('leads')" id="nav-leads"><span class="icon">🎯</span> Leads & Campaigns</a>
     <a onclick="showPage('estoque')" id="nav-estoque"><span class="icon">📦</span> Inventory</a>
     <a onclick="showPage('financeiro')" id="nav-financeiro"><span class="icon">💰</span> Financial</a>
+    <a onclick="showPage('parceiros')" id="nav-parceiros"><span class="icon">🤝</span> Trade Partners</a>
     <a onclick="showPage('settings')" id="nav-settings"><span class="icon">⚙️</span> Settings</a>
     <a onclick="showPage('usuarios')" id="nav-usuarios" style="display:none"><span class="icon">👤</span> Users</a>
   </nav>
@@ -522,7 +526,7 @@
 <script>
 // ===== DB =====
 let db = {
-  clientes: [], orcamentos: [], ordens: [], invoices: [],
+  clientes: [], orcamentos: [], ordens: [], invoices: [], parceiros: [],
   estoque: [], financeiro: [], contasPagar: [],
   leads: [], campaigns: [],
   users: [],
@@ -537,18 +541,18 @@ let db = {
     companyAddress: '',
     logoBase64: ''
   },
-  _id: { clientes:1, orcamentos:1, ordens:1, invoices:1, estoque:1, financeiro:1, contasPagar:1, leads:1, campaigns:1, users:1 }
+  _id: { clientes:1, orcamentos:1, ordens:1, invoices:1, estoque:1, financeiro:1, contasPagar:1, leads:1, campaigns:1, users:1, parceiros:1 }
 };
 const STORAGE_KEY = 'aluminumpro_v2';
 function salvarLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
 function salvar() { salvarLocal(); if(window._syncEnabled) syncToCloud(); }
-function carregar() { const d = localStorage.getItem(STORAGE_KEY); if(d) { try { const p=JSON.parse(d); db={...db,...p}; if(!db.invoices) db.invoices=[]; if(!db.contasPagar) db.contasPagar=[]; if(!db.leads) db.leads=[]; if(!db.campaigns) db.campaigns=[]; if(!db.settings) db.settings={gateway:'stripe_netlify',stripeFunction:'',paymentLink:'',financingLink:'',financingAPR:18,companyPhone:'',companyEmail:'',companyAddress:''}; if(!db.settings.stripeFunction) db.settings.stripeFunction=''; if(!db.settings.logoBase64 && db.settings.logoBase64 !== '') db.settings.logoBase64=''; if(!db._id.invoices) db._id.invoices=1; if(!db._id.contasPagar) db._id.contasPagar=1; if(!db._id.leads) db._id.leads=1; if(!db._id.campaigns) db._id.campaigns=1; if(!db.users) db.users=[]; if(!db._id.users) db._id.users=1; seedAdmin(); } catch(e){ seedAdmin(); } } else { seedAdmin(); } }
+function carregar() { const d = localStorage.getItem(STORAGE_KEY); if(d) { try { const p=JSON.parse(d); db={...db,...p}; if(!db.invoices) db.invoices=[]; if(!db.contasPagar) db.contasPagar=[]; if(!db.leads) db.leads=[]; if(!db.campaigns) db.campaigns=[]; if(!db.settings) db.settings={gateway:'stripe_netlify',stripeFunction:'',paymentLink:'',financingLink:'',financingAPR:18,companyPhone:'',companyEmail:'',companyAddress:''}; if(!db.settings.stripeFunction) db.settings.stripeFunction=''; if(!db.settings.logoBase64 && db.settings.logoBase64 !== '') db.settings.logoBase64=''; if(!db._id.invoices) db._id.invoices=1; if(!db._id.contasPagar) db._id.contasPagar=1; if(!db._id.leads) db._id.leads=1; if(!db._id.campaigns) db._id.campaigns=1; if(!db.users) db.users=[]; if(!db._id.users) db._id.users=1; if(!db.parceiros) db.parceiros=[]; if(!db._id.parceiros) db._id.parceiros=1; seedAdmin(); } catch(e){ seedAdmin(); } } else { seedAdmin(); } }
 function nextId(col) { const id=db._id[col]++; salvar(); return id; }
 
 // ===== NAVEGAÇÃO =====
 let paginaAtual = 'dashboard';
-const PAGE_TITLES = { dashboard:'Dashboard', clientes:'Clients', orcamentos:'Estimates', ordens:'Work Orders', invoices:'Invoices', leads:'Leads & Campaigns', estoque:'Materials Inventory', financeiro:'Financial', settings:'Settings', usuarios:'Manage Users' };
-const PAGE_RENDERS = { dashboard:renderDashboard, clientes:renderClientes, orcamentos:renderOrcamentos, ordens:renderOrdens, agenda:renderAgenda, invoices:renderInvoices, leads:renderLeads, estoque:renderEstoque, financeiro:renderFinanceiro, settings:renderSettings, usuarios:renderUsuarios };
+const PAGE_TITLES = { dashboard:'Dashboard', clientes:'Clients', orcamentos:'Estimates', ordens:'Work Orders', invoices:'Invoices', leads:'Leads & Campaigns', estoque:'Materials Inventory', financeiro:'Financial', settings:'Settings', usuarios:'Manage Users', parceiros:'Trade Partners' };
+const PAGE_RENDERS = { dashboard:renderDashboard, clientes:renderClientes, orcamentos:renderOrcamentos, ordens:renderOrdens, agenda:renderAgenda, invoices:renderInvoices, leads:renderLeads, estoque:renderEstoque, financeiro:renderFinanceiro, settings:renderSettings, usuarios:renderUsuarios, parceiros:renderParceiros };
 
 function showPage(page) {
   if(!canAccess(page)){ toast('⛔ Access não autorizado!','error'); return; }
@@ -659,6 +663,8 @@ async function syncFromCloud(companyId, fbDb) {
     const ls = await fb.getDoc(lr);
     if(ls.exists()){ cloudData.settings=cloudData.settings||{}; cloudData.settings.logoBase64=ls.data().logo||''; }
     db = cloudData;
+    if(!db.parceiros) db.parceiros=[];
+    if(!db._id.parceiros) db._id.parceiros=1;
     salvarLocal();
     return true;
   } catch(e){ console.error('[Cloud] syncFromCloud:',e); return false; }
@@ -828,7 +834,7 @@ function canAccess(page) {
     dashboard:true, clientes:p.clientes, orcamentos:p.orcamentos,
     ordens:p.orcamentos, invoices:p.orcamentos,
     financeiro:p.financeiro, estoque:p.estoque, leads:p.leads,
-    settings:false, usuarios:false
+    settings:false, usuarios:false, parceiros:p.parceiros
   };
   return !!map[page];
 }
@@ -845,6 +851,7 @@ function applyPermissions(user) {
   vis('nav-leads',      A||p.leads);
   vis('nav-estoque',    A||p.estoque);
   vis('nav-financeiro', A||p.financeiro);
+  vis('nav-parceiros',  A||p.parceiros);
   vis('nav-settings',   A);
   vis('nav-usuarios',   A);
 }
@@ -970,6 +977,7 @@ function renderUsuarios() {
             <label class="perm-toggle"><input type="checkbox" id="p-financeiro"><span>💰 Financial — lançamentos e contas</span></label>
             <label class="perm-toggle"><input type="checkbox" id="p-estoque"><span>📦 Materials Inventory</span></label>
             <label class="perm-toggle"><input type="checkbox" id="p-leads"><span>🎯 Leads & Campaigns</span></label>
+            <label class="perm-toggle"><input type="checkbox" id="p-parceiros"><span>🤝 Trade Partners — billing & scheduling</span></label>
           </div>
         </div>
         <div id="u-admin-area" style="display:none;margin-bottom:16px;padding:12px 14px;background:#eff6ff;border-radius:8px;font-size:.83rem;color:#1a5fa8;border:1px solid #bfdbfe">
@@ -994,7 +1002,7 @@ function abrirModalUsuario(uid) {
   document.getElementById('u-senha').value = '';
   document.getElementById('u-pass-hint').textContent = u ? '(ofixe em branco para não alterar)' : '(obrigatória)';
   const p = u?.perms||{};
-  ['clientes','orcamentos','financeiro','estoque','leads'].forEach(k=>{
+  ['clientes','orcamentos','financeiro','estoque','leads','parceiros'].forEach(k=>{
     const el=document.getElementById('p-'+k);
     if(el) el.checked = u?.isAdmin ? true : (!!p[k]);
   });
@@ -1028,7 +1036,8 @@ function salvarUsuario() {
         orcamentos:document.getElementById('p-orcamentos').checked,
         financeiro:document.getElementById('p-financeiro').checked,
         estoque:document.getElementById('p-estoque').checked,
-        leads:document.getElementById('p-leads').checked
+        leads:document.getElementById('p-leads').checked,
+        parceiros:document.getElementById('p-parceiros').checked
       };
     }
     toast('User updated!','success');
@@ -1043,7 +1052,8 @@ function salvarUsuario() {
         orcamentos:document.getElementById('p-orcamentos').checked,
         financeiro:document.getElementById('p-financeiro').checked,
         estoque:document.getElementById('p-estoque').checked,
-        leads:document.getElementById('p-leads').checked
+        leads:document.getElementById('p-leads').checked,
+        parceiros:document.getElementById('p-parceiros').checked
       }
     });
     toast('Usuário criado com sucesso!','success');
@@ -1074,7 +1084,7 @@ function addDays(d,n) { const dt=new Date(d); dt.setDate(dt.getDate()+n); return
 function clienteNome(id) { const c=db.clientes.find(x=>x.id==id); return c?c.nome:'-'; }
 function clienteObj(id) { return db.clientes.find(x=>x.id==id)||{}; }
 function orcTotal(orc) { return (orc.itens||[]).reduce((s,i)=>s+(parseFloat(i.qty)||0)*(parseFloat(i.preco)||0),0); }
-function servicoLabel(s) { return {gutter:'Gutter',soffit:'Soffit',pool_cage:'Pool Cage',carport:'Carport',railing:'Railing',outro:'Other'}[s]||s; }
+function servicoLabel(s) { return {gutter:'Gutter',soffit:'Soffit',leaf_guard:'Leaf Guard',pool_cage:'Pool Cage',carport:'Carport',railing:'Railing',outro:'Other'}[s]||s; }
 function invNumero(inv) { return 'INV-'+String(inv.id).padStart(4,'0'); }
 function isVencido(dataVenc) { return dataVenc && dataVenc < today(); }
 
@@ -1167,6 +1177,282 @@ function renderDashboard() {
 
 // ===== CLIENTES =====
 let clienteFiltro = '';
+let parceiroFiltro = '';
+let parceirosView = 'lista';
+let parceiroAgendaId = null;
+let parceiroAgendaDate = new Date();
+// ===== TRADE PARTNER PROGRAM (Subscription Club) =====
+const PARTNER_PLANS = {
+  bronze:     { label:'Bronze',     fee:2200,  range:'1–20 jobs/mo'    },
+  silver:     { label:'Silver',     fee:4200,  range:'21–40 jobs/mo'   },
+  gold:       { label:'Gold',       fee:6000,  range:'41–60 jobs/mo'   },
+  platinum:   { label:'Platinum',   fee:10000, range:'61–100 jobs/mo'  },
+  enterprise: { label:'Enterprise', fee:0,     range:'100+ jobs/mo (custom)' }
+};
+
+function planoBadge(plano) {
+  const p = PARTNER_PLANS[plano] || { label: plano || '-' };
+  return `<span class="badge badge-plano-${plano||'none'}">${p.label}</span>`;
+}
+
+function billingBadge(st) {
+  const cls   = { active:'badge-pago', past_due:'badge-vencido', canceled:'badge-cancelado', incomplete:'badge-pendente', pending:'badge-pendente' };
+  const label = { active:'Active', past_due:'Past Due', canceled:'Cancelled', incomplete:'Pending', pending:'Not Set Up' };
+  const k = st || 'pending';
+  return `<span class="badge ${cls[k]||'badge-pendente'}">${label[k]||k}</span>`;
+}
+
+function renderParceiros() {
+  document.getElementById('content').innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <h2>\u{1F91D} Trade Partners (${db.parceiros.length})</h2>
+        <div class="flex-gap">
+          <button class="btn ${parceirosView==='lista'?'btn-primary':'btn-outline'}" onclick="parceirosView='lista';renderParceiros()">\u{1F4CB} Partners</button>
+          <button class="btn ${parceirosView==='agenda'?'btn-primary':'btn-outline'}" onclick="parceirosView='agenda';renderParceiros()">\u{1F4C5} Schedule</button>
+          <button class="btn btn-primary" onclick="abrirModalParceiro()">+ New Partner</button>
+        </div>
+      </div>
+      ${parceirosView==='lista' ? renderParceirosLista() : renderParceirosAgendaTab()}
+    </div>`;
+  if (parceirosView==='lista') syncBillingStatus();
+}
+
+function renderParceirosLista() {
+  const lista = db.parceiros.filter(p=>!parceiroFiltro||p.empresa.toLowerCase().includes(parceiroFiltro.toLowerCase())||(p.contato||'').toLowerCase().includes(parceiroFiltro.toLowerCase()));
+  return `
+    <div class="search-bar"><input type="text" placeholder="\u{1F50D} Search company or contact..." value="${parceiroFiltro}" oninput="parceiroFiltro=this.value;renderParceiros()"></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Company</th><th>Contact</th><th>Plan</th><th>Monthly Fee</th><th>Status</th><th>Billing</th><th>Actions</th></tr></thead>
+      <tbody>${lista.length===0?'<tr class="empty-row"><td colspan="7">No trade partners yet</td></tr>':lista.map(p=>`<tr>
+        <td><strong>${p.empresa}</strong></td>
+        <td>${p.contato||'-'}<br><span style="color:var(--text-muted);font-size:.78rem">${p.email||''}</span></td>
+        <td>${planoBadge(p.plano)}</td>
+        <td>${fmt(p.mensalidade)}</td>
+        <td><span class="badge ${p.status==='Active'?'badge-pago':p.status==='Paused'?'badge-pendente':'badge-cancelado'}">${p.status}</span></td>
+        <td id="billing-cell-${p.id}">${billingBadge(p.billingStatus)}</td>
+        <td><div class="flex-gap">
+          <button class="btn btn-sm btn-outline" onclick="abrirModalParceiro(${p.id})">✏️</button>
+          <button class="btn btn-sm btn-gray" onclick="parceiroAgendaId=${p.id};parceirosView='agenda';renderParceiros()">\u{1F4C5}</button>
+          <button class="btn btn-sm" style="background:#0a6e5c;color:#fff" onclick="abrirCobrancaParceiro(${p.id})">🏦</button>
+          <button class="btn btn-sm btn-danger" onclick="excluirParceiro(${p.id})">\u{1F5D1}️</button>
+        </div></td></tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+function renderParceirosAgendaTab() {
+  if (!parceiroAgendaId && db.parceiros.length) parceiroAgendaId = db.parceiros[0].id;
+  if (!db.parceiros.length) return '<p style="padding:20px;color:var(--text-muted)">Add a trade partner first to see their schedule.</p>';
+  const opts = db.parceiros.map(p=>`<option value="${p.id}" ${p.id==parceiroAgendaId?'selected':''}>${p.empresa}</option>`).join('');
+  return `
+    <div class="flex-gap" style="margin-bottom:14px">
+      <label style="font-weight:600;font-size:.85rem;color:var(--text-muted)">Partner:</label>
+      <select onchange="parceiroAgendaId=parseInt(this.value);renderParceiros()">${opts}</select>
+    </div>
+    ${renderParceiroAgendaMes(parceiroAgendaId)}`;
+}
+
+function renderParceiroAgendaMes(pid) {
+  const ano = parceiroAgendaDate.getFullYear();
+  const mes = parceiroAgendaDate.getMonth();
+  const nomeMes = parceiroAgendaDate.toLocaleString('en-US',{month:'long',year:'numeric'});
+  const primeiroDia = new Date(ano, mes, 1).getDay();
+  const daysNoMes = new Date(ano, mes+1, 0).getDate();
+  const hoje = today();
+
+  const osMap = {};
+  db.ordens.filter(o=>o.parceiroId==pid).forEach(o => {
+    const d = o.dataAgendada || o.dataInicio;
+    if (!d) return;
+    if (!osMap[d]) osMap[d] = [];
+    osMap[d].push(o);
+  });
+
+  const daysSemana = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let cells = '';
+  for (let i = 0; i < primeiroDia; i++) cells += '<div class="cal-cell cal-empty"></div>';
+  for (let d = 1; d <= daysNoMes; d++) {
+    const dateStr = `${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = dateStr === hoje;
+    const osDia = osMap[dateStr] || [];
+    const osCards = osDia.map(o => {
+      const stColors = { 'Scheduled':'#3b82f6','In Progress':'#f59e0b','Completed':'#10b981','Cancelled':'#ef4444' };
+      const cor = stColors[o.status] || '#6b7280';
+      return `<div class="cal-os-card" style="background:${cor}" onclick="goToOrdem(${o.id})" title="${clienteNome(o.clienteId)} - ${servicoLabel(o.servico)}">
+        <span class="cal-os-num">#${o.id}</span>
+        <span class="cal-os-nome">${clienteNome(o.clienteId).split(' ')[0]}</span>
+        ${o.horaAgendada ? `<span class="cal-os-hora">${o.horaAgendada}</span>` : ''}
+      </div>`;
+    }).join('');
+    cells += `<div class="cal-cell ${isToday?'cal-hoje':''}">
+      <div class="cal-day-num ${osDia.length?'cal-has-os':''}">${d}</div>
+      <div class="cal-os-list">${osCards}</div>
+    </div>`;
+  }
+
+  return `
+    <div class="agenda-nav">
+      <button class="btn btn-outline" onclick="parceiroAgendaDate=new Date(parceiroAgendaDate.getFullYear(),parceiroAgendaDate.getMonth()-1,1);renderParceiros()">◀ Previous</button>
+      <h3 style="margin:0;text-transform:capitalize">${nomeMes}</h3>
+      <button class="btn btn-outline" onclick="parceiroAgendaDate=new Date(parceiroAgendaDate.getFullYear(),parceiroAgendaDate.getMonth()+1,1);renderParceiros()">Next ▶</button>
+      <button class="btn btn-gray" onclick="parceiroAgendaDate=new Date();renderParceiros()">Today</button>
+    </div>
+    <div class="agenda-legenda">
+      <span class="leg-item"><span class="leg-dot" style="background:#3b82f6"></span>Scheduled</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>In Progress</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Completed</span>
+      <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Cancelled</span>
+    </div>
+    <div class="calendario">
+      ${daysSemana.map(d=>`<div class="cal-header">${d}</div>`).join('')}
+      ${cells}
+    </div>`;
+}
+
+function abrirModalParceiro(id) {
+  const p = id?db.parceiros.find(x=>x.id==id):null;
+  const planoOpts = Object.keys(PARTNER_PLANS).map(k=>`<option value="${k}" ${p?.plano===k?'selected':''}>${PARTNER_PLANS[k].label} — ${PARTNER_PLANS[k].range}</option>`).join('');
+  abrirModal(`${p?'Edit':'New'} Trade Partner`,`
+    <div class="form-grid">
+      <div class="form-group span2"><label>Company Name *</label><input id="f-pc-empresa" value="${p?.empresa||''}" placeholder="Roofing / Remodeling company name"></div>
+      <div class="form-group"><label>Contact Name</label><input id="f-pc-contato" value="${p?.contato||''}" placeholder="Primary contact"></div>
+      <div class="form-group"><label>Phone</label><input id="f-pc-telefone" value="${p?.telefone||''}" placeholder="(305) 000-0000"></div>
+      <div class="form-group span2"><label>E-mail</label><input id="f-pc-email" type="email" value="${p?.email||''}" placeholder="billing@company.com"></div>
+      <div class="form-group"><label>Plan *</label><select id="f-pc-plano" onchange="const f=PARTNER_PLANS[this.value].fee;if(this.value!=='enterprise')document.getElementById('f-pc-mensalidade').value=f;">${planoOpts}</select></div>
+      <div class="form-group"><label>Monthly Fee ($)</label><input id="f-pc-mensalidade" type="number" step="0.01" value="${p?.mensalidade ?? 2200}"></div>
+      <div class="form-group"><label>Status</label><select id="f-pc-status">
+        <option value="Active" ${p?.status==='Active'?'selected':''}>Active</option>
+        <option value="Paused" ${p?.status==='Paused'?'selected':''}>Paused</option>
+        <option value="Cancelled" ${p?.status==='Cancelled'?'selected':''}>Cancelled</option>
+      </select></div>
+      <div class="form-group"><label>Start Date</label><input type="date" id="f-pc-inicio" value="${p?.dataInicio||today()}"></div>
+      <div class="form-group span2"><label>Notes</label><textarea id="f-pc-obs">${p?.obs||''}</textarea></div>
+    </div>`,
+  `<button class="btn btn-gray" onclick="fecharModal()">Cancel</button><button class="btn btn-primary" onclick="salvarParceiro(${id||0})">${p?'Save':'Add Partner'}</button>`);
+}
+
+function salvarParceiro(id) {
+  const empresa=document.getElementById('f-pc-empresa').value.trim(); if(!empresa){alert('Company name is required!');return;}
+  const obj={
+    empresa,
+    contato:document.getElementById('f-pc-contato').value,
+    telefone:document.getElementById('f-pc-telefone').value,
+    email:document.getElementById('f-pc-email').value,
+    plano:document.getElementById('f-pc-plano').value,
+    mensalidade:parseFloat(document.getElementById('f-pc-mensalidade').value)||0,
+    status:document.getElementById('f-pc-status').value,
+    dataInicio:document.getElementById('f-pc-inicio').value,
+    obs:document.getElementById('f-pc-obs').value
+  };
+  if(id){const i=db.parceiros.findIndex(x=>x.id==id);if(i>=0)db.parceiros[i]={...db.parceiros[i],...obj};}
+  else{obj.id=nextId('parceiros');obj.billingStatus='pending';db.parceiros.push(obj);}
+  salvar();fecharModal();renderParceiros();toast(id?'Partner updated!':'Trade partner added!','success');
+}
+
+function excluirParceiro(id) {
+  if(!confirm('Remove this trade partner? This does not cancel any active Stripe subscription.')) return;
+  db.parceiros = db.parceiros.filter(x=>x.id!=id);
+  salvar();renderParceiros();toast('Partner removed.','success');
+}
+
+async function abrirCobrancaParceiro(id) {
+  const p = db.parceiros.find(x=>x.id==id); if(!p) return;
+  const plano = PARTNER_PLANS[p.plano] || {label:p.plano,fee:p.mensalidade};
+  const corpo = `
+    <div style="text-align:center;padding:8px 0 16px">
+      <div style="font-size:2.2rem;margin-bottom:6px">\u{1F91D}</div>
+      <h3 style="margin:0;font-size:1.15rem;color:var(--text)">${p.empresa}</h3>
+      <p style="color:var(--text-muted);margin:4px 0 0">${plano.label} Partner Plan</p>
+    </div>
+    <div style="background:var(--bg);border-radius:12px;padding:18px;margin-bottom:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:2px">
+        <span style="font-size:1rem;font-weight:700">Recurring Monthly Fee</span>
+        <span style="font-size:1.6rem;font-weight:800;color:#22c55e">${fmt(p.mensalidade)}/mo</span>
+      </div>
+    </div>
+    <div style="background:linear-gradient(135deg,#0a6e5c15,#0a6e5c08);border:1px solid #0a6e5c40;border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:1.3rem">🏦</span>
+        <strong style="color:var(--text);font-size:.95rem">GoCardless Direct Debit (ACH)</strong>
+      </div>
+      <p style="font-size:.82rem;color:var(--text-muted);margin:0">Generates a secure GoCardless authorization link for <strong>${p.empresa}</strong> to connect their bank account and start automatic monthly billing. Send the link — no bank details are ever stored by this app, GoCardless handles the secure bank authorization.</p>
+    </div>
+    <div id="pc-billing-link-area"></div>`;
+  const footer = `
+    <button class="btn btn-gray" onclick="fecharModal()">Close</button>
+    <button class="btn" style="background:#0a6e5c;color:#fff;min-width:200px" id="btn-pc-stripe" onclick="criarAssinaturaParceiro(${id})">🏦 Generate Billing Link</button>`;
+  abrirModal('🏦 Set Up Recurring Billing', corpo, footer, '520px');
+}
+
+function planoLabelSafe(k){ return (PARTNER_PLANS[k]&&PARTNER_PLANS[k].label) || k || 'Partner'; }
+
+async function criarAssinaturaParceiro(id) {
+  const p = db.parceiros.find(x=>x.id==id); if(!p) return;
+  const s = db.settings;
+  const btn = document.getElementById('btn-pc-stripe');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Creating link...'; }
+  const isNetlify = window.location.hostname.includes('netlify.app') || window.location.hostname.includes('alumicraft');
+  const base = isNetlify ? '' : (s.stripeFunction ? s.stripeFunction.replace(/\/create-checkout$/, '') : 'https://alumicraft-stripe.netlify.app/.netlify/functions');
+  const FN_URL = (isNetlify ? '/.netlify/functions' : base) + '/create-subscription';
+  try {
+    const resp = await fetch(FN_URL, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        amount: p.mensalidade, partnerId: p.id, partnerName: p.empresa,
+        partnerEmail: p.email, plan: p.plano,
+        companyId: getCloudConfig().cloudCompanyId || '',
+        successUrl: window.location.origin + window.location.pathname + '?billing=success',
+        cancelUrl: window.location.origin + window.location.pathname + '?billing=cancelled'
+      })
+    });
+    const data = await resp.json();
+    if(!resp.ok || !data.url) throw new Error(data.error || 'Could not create billing link.');
+    p.stripeSubscriptionUrl = data.url;
+    p.billingStatus = p.billingStatus==='active' ? 'active' : 'pending';
+    salvar();
+    const area = document.getElementById('pc-billing-link-area');
+    if(area) area.innerHTML = `
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+        <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:6px">Billing link ready — copy and send to ${p.empresa}:</div>
+        <div style="display:flex;gap:8px">
+          <input readonly value="${data.url}" style="flex:1;font-size:.8rem" onclick="this.select()">
+          <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${data.url}');toast('Link copied!','success')">\u{1F4CB} Copy</button>
+        </div>
+        <a href="mailto:${p.email||''}?subject=${encodeURIComponent('AlumiCraft Trade Partner — Set Up Billing')}&body=${encodeURIComponent('Hi '+(p.contato||p.empresa)+',\n\nPlease use the secure link below to set up automatic monthly billing for your '+planoLabelSafe(p.plano)+' partner plan:\n\n'+data.url+'\n\nThanks,\nAlumiCraft')}" class="btn btn-sm btn-gray" style="margin-top:8px;display:inline-block">✉️ Open Email Draft</a>
+      </div>`;
+    if(btn){ btn.disabled=false; btn.textContent='⚡ Generate New Link'; }
+  } catch(e) {
+    toast('GoCardless error: '+e.message,'error');
+    if(btn){ btn.disabled=false; btn.textContent='🏦 Generate Billing Link'; }
+  }
+}
+
+async function syncBillingStatus() {
+  try {
+    if(!window._syncEnabled || !window._fbDb || !db.parceiros.length) return;
+    const fb = await fbMods();
+    const cid = getCloudConfig().cloudCompanyId;
+    const ref = fb.doc(window._fbDb,'alumicraft_billing',cid);
+    const snap = await fb.getDoc(ref);
+    if(!snap.exists()) return;
+    const data = snap.data() || {};
+    let changed = false;
+    db.parceiros.forEach(p=>{
+      const b = data[p.id];
+      if(b && (b.status!==p.billingStatus || b.subscriptionId!==p.stripeSubscriptionId)){
+        p.billingStatus = b.status;
+        p.stripeSubscriptionId = b.subscriptionId;
+        p.stripeCustomerId = b.customerId;
+        p.lastPayment = b.lastPayment;
+        changed = true;
+        const cell = document.getElementById('billing-cell-'+p.id);
+        if(cell) cell.innerHTML = billingBadge(b.status);
+      }
+    });
+    if(changed) salvarLocal();
+  } catch(e) { console.warn('[Billing sync]', e.message); }
+}
+
 function renderClientes() {
   const lista = db.clientes.filter(c=>!clienteFiltro||c.nome.toLowerCase().includes(clienteFiltro.toLowerCase())||(c.telefone||'').includes(clienteFiltro)||(c.email||'').toLowerCase().includes(clienteFiltro.toLowerCase()));
   document.getElementById('content').innerHTML = `
@@ -1288,7 +1574,7 @@ function abrirModalOrc(id) {
 }
 
 function servicoSelect(id,val) {
-  const opts=['gutter','soffit','pool_cage','carport','railing','outro'];
+  const opts=['gutter','soffit','leaf_guard','pool_cage','carport','railing','outro'];
   return `<select id="${id}">${opts.map(v=>`<option value="${v}" ${val===v?'selected':''}>${servicoLabel(v)}</option>`).join('')}</select>`;
 }
 
@@ -1296,7 +1582,7 @@ function itemRowHtml(it,i) {
   const sub=(parseFloat(it.qty)||0)*(parseFloat(it.preco)||0);
   return `<div class="item-row" id="item-row-${i}">
     <div style="display:grid;grid-template-columns:auto 1fr;gap:4px">
-      <select class="item-tipo" onchange="calcTotal()">${['gutter','soffit','pool_cage','carport','railing','outro'].map(v=>`<option value="${v}" ${it.tipo===v?'selected':''}>${servicoLabel(v)}</option>`).join('')}</select>
+      <select class="item-tipo" onchange="calcTotal()">${['gutter','soffit','leaf_guard','pool_cage','carport','railing','outro'].map(v=>`<option value="${v}" ${it.tipo===v?'selected':''}>${servicoLabel(v)}</option>`).join('')}</select>
       <input placeholder="Description" value="${it.ofsc||''}" class="item-ofsc" oninput="calcTotal()">
     </div>
     <input type="number" placeholder="Qtd" value="${it.qty||1}" min="0" step="0.01" class="item-qty" oninput="calcTotal()">
@@ -1422,6 +1708,7 @@ function abrirModalOrdem(id) {
     <div class="form-grid">
       <div class="form-group"><label>Client *</label><select id="f-clienteId"><option value="">Select...</option>${clientesOpts}</select></div>
       <div class="form-group"><label>Linked Estimate</label><select id="f-orcId"><option value="">None</option>${orcOpts}</select></div>
+      <div class="form-group"><label>Trade Partner (optional)</label><select id="f-parceiroId"><option value="">None</option>${db.parceiros.map(pp=>`<option value="${pp.id}" ${o?.parceiroId==pp.id?'selected':''}>${pp.empresa}</option>`).join('')}</select></div>
       <div class="form-group"><label>Service</label>${servicoSelect('f-servico',o?.servico)}</div>
       <div class="form-group"><label>Technician</label><input id="f-tec" value="${o?.tecnico||''}" placeholder="Technician name"></div>
       <div class="form-group"><label>📅 Scheduled Date *</label><input type="date" id="f-dataAgendada" value="${o?.dataAgendada||today()}" required></div>
@@ -1443,7 +1730,7 @@ function abrirModalOrdem(id) {
 function salvarOrdem(id) {
   const clienteId=document.getElementById('f-clienteId').value; if(!clienteId){alert('Please select a client!');return;}
   const dataAgendada=document.getElementById('f-dataAgendada').value; if(!dataAgendada){alert('Scheduled Date is required!');return;}
-  const obj={clienteId:parseInt(clienteId),orcamentoId:parseInt(document.getElementById('f-orcId').value)||null,servico:document.getElementById('f-servico').value,tecnico:document.getElementById('f-tec').value,dataAgendada,horaAgendada:document.getElementById('f-horaAgendada').value||'08:00',dataInicio:document.getElementById('f-dataInicio').value,dataFim:document.getElementById('f-dataFim').value,status:document.getElementById('f-status').value,obs:document.getElementById('f-obs').value};
+  const obj={clienteId:parseInt(clienteId),orcamentoId:parseInt(document.getElementById('f-orcId').value)||null,servico:document.getElementById('f-servico').value,tecnico:document.getElementById('f-tec').value,dataAgendada,horaAgendada:document.getElementById('f-horaAgendada').value||'08:00',dataInicio:document.getElementById('f-dataInicio').value,dataFim:document.getElementById('f-dataFim').value,status:document.getElementById('f-status').value,obs:document.getElementById('f-obs').value,parceiroId:parseInt(document.getElementById('f-parceiroId').value)||null};
   let ordFinalId=id;
   if(id){const i=db.ordens.findIndex(x=>x.id==id);if(i>=0)db.ordens[i]={...db.ordens[i],...obj};}else{obj.id=nextId('ordens');obj.attachments=[];db.ordens.push(obj);ordFinalId=obj.id;}
   salvar();fecharModal();renderOrdens();toast(id?'Work Order updated!':'Work Order created!','success');
@@ -3956,7 +4243,7 @@ carregar();
     return '<div class="item-row" id="item-row-' + i + '">' +
       '<div style="display:grid;grid-template-columns:auto 1fr;gap:4px">' +
         '<select class="item-tipo" onchange="' + calcFn + '">' +
-          ['gutter','soffit','pool_cage','carport','railing','outro'].map(function(v) {
+          ['gutter','soffit','leaf_guard','pool_cage','carport','railing','outro'].map(function(v) {
             return '<option value="' + v + '"' + (it.tipo === v ? ' selected' : '') + '>' + (typeof servicoLabel === 'function' ? servicoLabel(v) : v) + '</option>';
           }).join('') +
         '</select>' +
