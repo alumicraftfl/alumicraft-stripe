@@ -1232,7 +1232,7 @@ function renderParceirosLista() {
         <td><div class="flex-gap">
           <button class="btn btn-sm btn-outline" onclick="abrirModalParceiro(${p.id})">✏️</button>
           <button class="btn btn-sm btn-gray" onclick="parceiroAgendaId=${p.id};parceirosView='agenda';renderParceiros()">\u{1F4C5}</button>
-          <button class="btn btn-sm" style="background:#635bff;color:#fff" onclick="abrirCobrancaParceiro(${p.id})">⚡</button>
+          <button class="btn btn-sm" style="background:#0a6e5c;color:#fff" onclick="abrirCobrancaParceiro(${p.id})">🏦</button>
           <button class="btn btn-sm btn-danger" onclick="excluirParceiro(${p.id})">\u{1F5D1}️</button>
         </div></td></tr>`).join('')}</tbody>
     </table></div>`;
@@ -1368,18 +1368,18 @@ async function abrirCobrancaParceiro(id) {
         <span style="font-size:1.6rem;font-weight:800;color:#22c55e">${fmt(p.mensalidade)}/mo</span>
       </div>
     </div>
-    <div style="background:linear-gradient(135deg,#635bff15,#635bff08);border:1px solid #635bff40;border-radius:10px;padding:14px;margin-bottom:16px">
+    <div style="background:linear-gradient(135deg,#0a6e5c15,#0a6e5c08);border:1px solid #0a6e5c40;border-radius:10px;padding:14px;margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:1.3rem">⚡</span>
-        <strong style="color:var(--text);font-size:.95rem">Stripe Recurring Billing</strong>
+        <span style="font-size:1.3rem">🏦</span>
+        <strong style="color:var(--text);font-size:.95rem">GoCardless Direct Debit (ACH)</strong>
       </div>
-      <p style="font-size:.82rem;color:var(--text-muted);margin:0">Generates a secure Stripe Checkout link for <strong>${p.empresa}</strong> to enter their card and start automatic monthly billing. Send the link — no card data ever passes through this app.</p>
+      <p style="font-size:.82rem;color:var(--text-muted);margin:0">Generates a secure GoCardless authorization link for <strong>${p.empresa}</strong> to connect their bank account and start automatic monthly billing. Send the link — no bank details are ever stored by this app, GoCardless handles the secure bank authorization.</p>
     </div>
     <div id="pc-billing-link-area"></div>`;
   const footer = `
     <button class="btn btn-gray" onclick="fecharModal()">Close</button>
-    <button class="btn" style="background:#635bff;color:#fff;min-width:200px" id="btn-pc-stripe" onclick="criarAssinaturaParceiro(${id})">⚡ Generate Billing Link</button>`;
-  abrirModal('⚡ Set Up Recurring Billing', corpo, footer, '520px');
+    <button class="btn" style="background:#0a6e5c;color:#fff;min-width:200px" id="btn-pc-stripe" onclick="criarAssinaturaParceiro(${id})">🏦 Generate Billing Link</button>`;
+  abrirModal('🏦 Set Up Recurring Billing', corpo, footer, '520px');
 }
 
 function planoLabelSafe(k){ return (PARTNER_PLANS[k]&&PARTNER_PLANS[k].label) || k || 'Partner'; }
